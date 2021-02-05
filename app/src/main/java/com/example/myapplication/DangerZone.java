@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -17,8 +18,12 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
+import android.widget.RelativeLayout;
+import android.widget.TableLayout;
+import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -114,10 +119,19 @@ public class DangerZone extends AppCompatActivity {
             }
 
             Log.d("qwe", "Adding " + pkg.packageName);
-            final Button btn = new Button(context);
-            final LinearLayout.LayoutParams buttonlayout = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            appLaunchContainer.addView(btn, buttonlayout);
+//            final LinearLayout.LayoutParams buttonlayout = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
 
+            ImageView img = new ImageView(context);
+            try {
+                Drawable icon = pm.getApplicationIcon(pkg);
+                img.setImageDrawable(icon);
+                img.setLayoutParams(new TableRow.LayoutParams(75, 75));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            final Button btn = new Button(context);
+            btn.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.WRAP_CONTENT, TableRow.LayoutParams.WRAP_CONTENT));
             btn.setText(pkg.packageName);
             btn.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -125,6 +139,17 @@ public class DangerZone extends AppCompatActivity {
                     context.startActivity(intent);
                 }
             });
+
+            LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            TableLayout table = new TableLayout(context);
+            table.setLayoutParams(layoutParams);
+            TableRow tr = new TableRow(context);
+            tr.setLayoutParams(layoutParams);
+
+            tr.addView(img);
+            tr.addView(btn);
+            table.addView(tr);
+            appLaunchContainer.addView(table);
         }
     }
 }

@@ -79,11 +79,15 @@ public class MyUtils {
 
 
     public Set<String> getDangerProcessesSet() {
-        return new HashSet<>(Arrays.asList(getDangerProcessesString().split("\\s+")));
+        Set<String> hs = new HashSet<>(Arrays.asList(getDangerProcessesString().split("\\s+")));
+        hs.remove("");
+        return hs;
     }
 
     public Set<String> getCriticalProcessesSet() {
-        return new HashSet<>(Arrays.asList(getCriticalProcessesString().split("\\s+")));
+        Set<String> hs = new HashSet<>(Arrays.asList(getCriticalProcessesString().split("\\s+")));
+        hs.remove("");
+        return hs;
     }
 
     public String getCriticalProcessesString() {
