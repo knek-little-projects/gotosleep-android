@@ -74,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
             mainActivityContainer.setVisibility(View.VISIBLE);
         } else {
             mainActivityContainer.setVisibility(View.GONE);
-            if (isDanger) {
+            if (!isSafe) {
                 try {
                     if (!myUtils.runAnotherHomeLauncher()) {
                         mainActivityContainer.setVisibility(View.VISIBLE);
@@ -193,8 +193,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("Timer", "This id=" + Long.toString(id) + " " + "; runningTimerId=" + Long.toString(runningTimerId));
 
                 if (!myUtils.isNowSafe() /* Critical and Danger zones */) {
-                    Set<String> processSet = myUtils.getDangerProcessesSet();
-
                     UsageStatsManager mUsageStatsManager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
                     long time = System.currentTimeMillis();
                     long millisec = 60000;
@@ -212,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         String pkgName = stats.get(0).getPackageName();
                         Log.d("Timer", "Last is " + pkgName);
-                        if (processSet.contains(pkgName)) {
+                        if (!StaticProcessList.fromSettings(myUtils).isPackageAllowed(pkgName)) {
                             bringToFront();
                         }
                     }

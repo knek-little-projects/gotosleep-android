@@ -111,7 +111,7 @@ public class MyUtils {
     }
 
     public boolean isNowSafe() {
-//        return false;
+//        return true;
         return isTimeSeq(getSafeTime(), getNow(), getDangerTime());
     }
 
@@ -121,7 +121,7 @@ public class MyUtils {
     }
 
     public boolean isNowCritical() {
-//        return true;
+//        return false;
         return isTimeSeq(getCriticalTime(), getNow(), getSafeTime());
     }
 
@@ -243,8 +243,6 @@ public class MyUtils {
     }
 
     static private Calendar getAfter(Calendar now, int hours, int minutes) {
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.US);
-
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.HOUR_OF_DAY, hours);
         cal.set(Calendar.MINUTE, minutes);

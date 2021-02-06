@@ -87,16 +87,7 @@ public class DangerZone extends AppCompatActivity {
             }
         }
 
-        Set<String> blacklist = null;
-        Set<String> whitelist = null;
-
-        if (myUtils.isNowDanger()) {
-            blacklist = myUtils.getDangerProcessesSet();
-        }
-
-        if (myUtils.isNowCritical()) {
-            whitelist = myUtils.getCriticalProcessesSet();
-        }
+        StaticProcessList staticProcessList = StaticProcessList.fromSettings(myUtils);
 
         final PackageManager pm = getPackageManager();
         final List<ApplicationInfo> pkgs = pm.getInstalledApplications(0);
@@ -105,11 +96,7 @@ public class DangerZone extends AppCompatActivity {
                 continue;
             }
 
-            if (whitelist != null && !whitelist.contains(pkg.packageName)) {
-                continue;
-            }
-
-            if (blacklist != null && blacklist.contains(pkg.packageName)) {
+            if (!staticProcessList.isPackageAllowed(pkg.packageName)) {
                 continue;
             }
 
