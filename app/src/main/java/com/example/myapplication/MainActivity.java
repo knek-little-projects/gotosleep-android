@@ -22,6 +22,7 @@ import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -209,9 +210,12 @@ public class MainActivity extends AppCompatActivity {
                         Log.d("Timer", "Empty usage stats");
                     } else {
                         String pkgName = stats.get(0).getPackageName();
-                        Log.d("Timer", "Last is " + pkgName);
-                        if (!StaticProcessList.fromSettings(myUtils).isPackageAllowed(pkgName)) {
+                        if (pkgName != null && !pkgName.equals(getPackageName()) && !StaticProcessList.fromSettings(myUtils).isPackageAllowed(pkgName)) {
+                            Log.w("Timer", "Last is " + pkgName);
+                            Log.w("Timer", "BRINGING TO FRONT");
                             bringToFront();
+                        } else {
+                            Log.d("Timer", "Last is " + pkgName);
                         }
                     }
                 }
@@ -663,9 +667,9 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.loadSettingsButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                ((EditText) findViewById(R.id.editSafeTime)).setText(myUtils.getSafeTime());
-                ((EditText) findViewById(R.id.editDangerTime)).setText(myUtils.getDangerTime());
-                ((EditText) findViewById(R.id.editCriticalTime)).setText(myUtils.getCriticalTime());
+                ((EditText) findViewById(R.id.editSafeTime)).setText(TextUtils.join(",", myUtils.getSafeTime()));
+                ((EditText) findViewById(R.id.editDangerTime)).setText(TextUtils.join(",", myUtils.getDangerTime()));
+                ((EditText) findViewById(R.id.editCriticalTime)).setText(TextUtils.join(",", myUtils.getCriticalTime()));
             }
         });
 
