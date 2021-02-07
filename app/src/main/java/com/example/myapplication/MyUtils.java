@@ -111,7 +111,7 @@ public class MyUtils {
     }
 
     public boolean isNowSafe() {
-//        return true;
+//        return false;
         return isTimeSeq(getSafeTime(), getNow(), getDangerTime());
     }
 
@@ -121,7 +121,7 @@ public class MyUtils {
     }
 
     public boolean isNowCritical() {
-//        return false;
+//        return true;
         return isTimeSeq(getCriticalTime(), getNow(), getSafeTime());
     }
 
