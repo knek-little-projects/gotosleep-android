@@ -667,9 +667,9 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.loadSettingsButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                ((EditText) findViewById(R.id.editSafeTime)).setText(TextUtils.join(",", myUtils.getSafeTime()));
-                ((EditText) findViewById(R.id.editDangerTime)).setText(TextUtils.join(",", myUtils.getDangerTime()));
-                ((EditText) findViewById(R.id.editCriticalTime)).setText(TextUtils.join(",", myUtils.getCriticalTime()));
+                ((EditText) findViewById(R.id.editSafeTime)).setText(  myUtils.getSafeTime());
+                ((EditText) findViewById(R.id.editDangerTime)).setText(myUtils.getDangerTime());
+                ((EditText) findViewById(R.id.editCriticalTime)).setText(myUtils.getCriticalTime());
             }
         });
 
