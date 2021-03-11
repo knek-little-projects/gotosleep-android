@@ -16,22 +16,24 @@ public class MyReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.i("MyReceiver", "MyService Receiver Intent" + intent.toString());
+        MyUtils myUtils = new MyUtils(context);
+        myUtils.log("MyReceiver.onReceive: intent " + intent.toString());
 
         String action = intent.getAction();
         if (action != null) {
-            MyUtils myUtils = new MyUtils(context);
-            myUtils.log("ACTION " + action);
+            myUtils.log("MyReceiver.onReceive: action " + action);
 
             if (action.equals(Intent.ACTION_USER_PRESENT) && myUtils.isNowSafe()) {
+                myUtils.log("MyReceiver.onReceive: going HOME" + action);
                 myUtils.runAnotherHomeLauncher();
                 return;
             }
+        } else {
+            myUtils.log("MyReceiver.onReceive: action NULL");
         }
 
         Intent i = new Intent(context, MyService.class);
         i.putExtra("caller", "BoroadcastReceiver");
         context.startService(i);
-
     }
 }

@@ -20,7 +20,8 @@ public class MyWorker extends Worker {
     @Override
     public Result doWork() {
         Log.v("Worker", "doWork: start");
-        new MyUtils(getApplicationContext()).smartLock("PeriodicWorker");
+        MyUtils myUtils = new MyUtils(getApplicationContext());
+        myUtils.smartLock("PeriodicWorker");  // doesnt do anything
         Log.v("Worker", "doWork: end");
         return Result.retry();
     }

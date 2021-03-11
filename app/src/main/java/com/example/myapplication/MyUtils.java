@@ -1,6 +1,8 @@
 package com.example.myapplication;
 
 import android.app.admin.DevicePolicyManager;
+import android.app.usage.UsageStats;
+import android.app.usage.UsageStatsManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -19,8 +21,10 @@ import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TimeZone;
@@ -42,6 +46,7 @@ public class MyUtils {
     private final String HOME_LAUNCHER = "HOME_LAUNCHER";
     private final String DANGER_PROCESSES = "killProcessList";
     private final String CRITICAL_PROCESSES = "CRITICAL_PROCESSES";
+    private final String LAST_CRITICAL_TIME = "LAST_CRITICAL_TIME";
 
     public boolean runAnotherHomeLauncher() {
         String homeLauncher = getHomeLauncher();
@@ -286,28 +291,84 @@ public class MyUtils {
         return getAfter(now, getCriticalTime()).getTimeInMillis();
     }
 
+    public boolean isFirstCriticalTimeToday() {
+        long lastMillis = getPreferences().getLong(LAST_CRITICAL_TIME, 0);
+        Calendar lastInstance = Calendar.getInstance();
+        lastInstance.setTimeInMillis(lastMillis);
+
+        Calendar today = Calendar.getInstance();
+
+        return today.get(Calendar.DAY_OF_MONTH) == lastInstance.get(Calendar.DAY_OF_MONTH)
+                &&
+                today.get(Calendar.MONTH) == lastInstance.get(Calendar.MONTH)
+                &&
+                today.get(Calendar.YEAR) == lastInstance.get(Calendar.YEAR)
+                ;
+    }
+
+    public void updateLastCriticalTime() {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putLong(LAST_CRITICAL_TIME, Calendar.getInstance().getTimeInMillis());
+        editor.apply();
+    }
+
+    public boolean isForbiddenAppRunning() {
+        UsageStatsManager mUsageStatsManager = (UsageStatsManager) context.getSystemService(Context.USAGE_STATS_SERVICE);
+        long time = System.currentTimeMillis();
+        long millisec = 60000;
+        List<UsageStats> stats = mUsageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - millisec, time);
+
+        stats.sort(new Comparator<UsageStats>() {
+            @Override
+            public int compare(UsageStats a, UsageStats b) {
+                return -Long.compare(a.getLastTimeUsed(), b.getLastTimeUsed());
+            }
+        });
+
+        if (stats.isEmpty()) {
+            Log.d("Timer", "Empty usage stats");
+        } else {
+            String pkgName = stats.get(0).getPackageName();
+            if (pkgName != null && !pkgName.equals(context.getPackageName()) && !StaticProcessList.fromSettings(this).isPackageAllowed(pkgName)) {
+                Log.w("Timer", "Last is " + pkgName);
+                Log.w("Timer", "BRINGING TO FRONT");
+                return true;
+            } else {
+                Log.d("Timer", "Last is " + pkgName);
+            }
+        }
+
+        return false;
+    }
+
     public void smartLock(String caller) {
-//        if (caller == null) {
-//            log("CALL FROM ???");
-//        } else {
-//            log("CALL FROM " + caller);
-//        }
-//
-//        if (isNowSafe()) {
-//            log("Time is SAFE");
-//        }
-//
-//        if (isNowDanger()) {
-//            log("Time is DANGEROUS");
-//        }
-//
-//        if (isNowCritical()) {
-//            log("Time is CRITICAL");
-//            if (MyAdmin.isEnabled(context)) {
-//                MyAdmin.lockNow(context);
-//            } else {
-//                log("ERROR: ADMIN IS DISABLED");
-//            }
-//        }
+        log("Smartlock: call from " + (caller == null ? "NULL" : caller));
+
+        boolean doLock = false;
+
+        if (isNowCritical()) {
+            log("Smartlock: Time is CRITICAL");
+
+            if (isFirstCriticalTimeToday()) {
+                log("Smartlock: First critical time today");
+                updateLastCriticalTime();
+                doLock = true;
+            } else {
+                if (isForbiddenAppRunning()) {
+                    log("Smartlock: forbidden app running: locking!");
+                    doLock = true;
+                }
+            }
+        }
+
+        if (doLock) {
+            runAnotherHomeLauncher();
+
+            if (MyAdmin.isEnabled(context)) {
+                MyAdmin.lockNow(context);
+            } else {
+                log("ERROR: ADMIN IS DISABLED");
+            }
+        }
     }
 }

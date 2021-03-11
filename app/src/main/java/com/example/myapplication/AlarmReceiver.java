@@ -13,7 +13,8 @@ import java.util.Calendar;
 public class AlarmReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.i("AlarmReceiver", "MyService Receiver Intent" + intent.toString());
+        MyUtils myUtils = new MyUtils(context);
+        myUtils.log("AlarmReceiver.onReceive: " + intent.toString());
 
         Intent i = new Intent(context, MyService.class);
         i.putExtra("caller", "AlarmManager");
