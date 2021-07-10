@@ -42,12 +42,12 @@
         </activity>
 
         <service
-            android:name=".MyService"
+            android:name=".RepeatSmartlockService"
             android:label="Test"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <receiver
-            android:name=".MyReceiver"
+            android:name=".RepeatSmartlockReceiver"
             android:enabled="true">
             <intent-filter>
                 <action android:name="android.intent.action.USER_PRESENT" />
@@ -57,9 +57,9 @@
                 <category android:name="android.intent.category.HOME" />
             </intent-filter>
         </receiver>
-        <receiver android:name=".AlarmReceiver" />
+        <receiver android:name=".RepeatSmartlockAlarm" />
         <receiver
-            android:name=".MyAdmin"
+            android:name=".DeviceAdmin"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data
                 android:name="android.app.device_admin"

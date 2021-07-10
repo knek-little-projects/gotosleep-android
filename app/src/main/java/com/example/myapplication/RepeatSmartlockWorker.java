@@ -1,6 +1,5 @@
 package com.example.myapplication;
 
-import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.util.Log;
 
@@ -8,11 +7,9 @@ import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-import static android.content.Context.DEVICE_POLICY_SERVICE;
+public class RepeatSmartlockWorker extends Worker {
 
-public class MyWorker extends Worker {
-
-    public MyWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
+    public RepeatSmartlockWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
     }
 
@@ -20,8 +17,8 @@ public class MyWorker extends Worker {
     @Override
     public Result doWork() {
         Log.v("Worker", "doWork: start");
-        MyUtils myUtils = new MyUtils(getApplicationContext());
-        myUtils.smartLock("PeriodicWorker");  // doesnt do anything
+        Kernel kernel = new Kernel(getApplicationContext());
+        kernel.smartLock("PeriodicWorker");  // doesnt do anything
         Log.v("Worker", "doWork: end");
         return Result.retry();
     }

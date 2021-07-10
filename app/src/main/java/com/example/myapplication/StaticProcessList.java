@@ -1,7 +1,5 @@
 package com.example.myapplication;
 
-import androidx.annotation.NonNull;
-
 import java.util.Set;
 
 public class StaticProcessList {
@@ -13,15 +11,15 @@ public class StaticProcessList {
         this.whitelist = whitelist;
     }
 
-    static public StaticProcessList fromSettings(MyUtils myUtils) {
+    static public StaticProcessList fromPreferences(Kernel kernel, Preferences preferences) {
         Set<String> blacklist = null;
-        if (myUtils.isNowDanger()) {
-            blacklist = myUtils.getDangerProcessesSet();
+        if (kernel.isNowDanger()) {
+            blacklist = preferences.getDangerProcessesSet();
         }
 
         Set<String> whitelist = null;
-        if (myUtils.isNowCritical()) {
-            whitelist = myUtils.getCriticalProcessesSet();
+        if (kernel.isNowCritical()) {
+            whitelist = preferences.getCriticalProcessesSet();
         }
 
         return new StaticProcessList(blacklist, whitelist);

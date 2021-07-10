@@ -1,6 +1,5 @@
 package com.example.myapplication;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
@@ -15,14 +14,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Bundle;
-import android.os.PersistableBundle;
 import android.provider.Settings;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -32,7 +28,6 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -50,25 +45,26 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends AppCompatActivity {
     public static final int RESULT_ENABLE = 11;
     public Timer timer = null;
-    public MyUtils myUtils = null;
+    public Kernel kernel = null;
+    public Preferences preferences = null;
 
     @Override
     protected void onResume() {
         super.onResume();
 
         CheckBox smartLockCheck = (CheckBox) findViewById(R.id.smartLockCheck);
-        smartLockCheck.setChecked(myUtils.isSmartLockEnabled());
+        smartLockCheck.setChecked(preferences.isSmartLockEnabled());
 
-        if (myUtils.getShouldTimerBeRunning() && timer == null) {
+        if (preferences.getShouldTimerBeRunning() && timer == null) {
             runTimer();
         }
 
         View mainActivityContainer = (View) findViewById(R.id.mainActivityContainer);
 
-        boolean isAdmin = MyAdmin.isEnabled(this);
-        boolean isSmart = myUtils.isSmartLockEnabled();
-        boolean isSafe = myUtils.isNowSafe();
-        boolean isDanger = myUtils.isNowDanger();
+        boolean isAdmin = DeviceAdmin.isEnabled(this);
+        boolean isSmart = preferences.isSmartLockEnabled();
+        boolean isSafe = kernel.isNowSafe();
+        boolean isDanger = kernel.isNowDanger();
 
 
         if (!isAdmin || !isSmart || isSafe) {
@@ -77,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
             mainActivityContainer.setVisibility(View.GONE);
             if (!isSafe) {
                 try {
-                    if (!myUtils.runAnotherHomeLauncher()) {
+                    if (!kernel.runAnotherHomeLauncher()) {
                         mainActivityContainer.setVisibility(View.VISIBLE);
                         Toast.makeText(this, "ERROR: Please set Home Launcher!", Toast.LENGTH_LONG).show();
                     }
@@ -90,13 +86,13 @@ public class MainActivity extends AppCompatActivity {
 
         if (isAdmin && isSmart) {
             ensureAllRunning();
-            myUtils.smartLock("HOME");
+            kernel.smartLock("HOME");
         }
     }
 
     private void ensureAllRunning() {
-        if (myUtils.isSmartLockEnabled() && !myUtils.getShouldTimerBeRunning()) {
-            myUtils.setShouldTimerBeRunning(true);
+        if (preferences.isSmartLockEnabled() && !preferences.getShouldTimerBeRunning()) {
+            preferences.setShouldTimerBeRunning(true);
         }
 
         if (timer == null) {
@@ -104,9 +100,9 @@ public class MainActivity extends AppCompatActivity {
             runTimer();
         }
 
-        if (!AlarmReceiver.isSomeAlarmSet(this)) {
+        if (!RepeatSmartlockAlarm.isSomeAlarmSet(this)) {
             Log.w("Smartlock", "Alarm is not running: starting");
-            AlarmReceiver.setAlarm(this);
+            RepeatSmartlockAlarm.setAlarm(this);
         }
 
         if (!isPeriodicWorkerRunning()) {
@@ -117,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isPeriodicWorkerRunning() {
         try {
-            List<WorkInfo> infos = WorkManager.getInstance().getWorkInfosForUniqueWork(MyWorker.class.getName()).get();
+            List<WorkInfo> infos = WorkManager.getInstance().getWorkInfosForUniqueWork(RepeatSmartlockWorker.class.getName()).get();
             for (WorkInfo info : infos) {
                 if (info.getState() == WorkInfo.State.ENQUEUED || info.getState() == WorkInfo.State.RUNNING) {
                     return true;
@@ -131,11 +127,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void startPeriodicWorker() {
         PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(
-                MyWorker.class, 15, TimeUnit.MINUTES
+                RepeatSmartlockWorker.class, 15, TimeUnit.MINUTES
         ).build();
 
         WorkManager.getInstance().enqueueUniquePeriodicWork(
-                MyWorker.class.getName(), ExistingPeriodicWorkPolicy.KEEP, workRequest);
+                RepeatSmartlockWorker.class.getName(), ExistingPeriodicWorkPolicy.KEEP, workRequest);
 
     }
 
@@ -173,13 +169,13 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void run() {
-                if (!myUtils.getShouldTimerBeRunning()) {
+                if (!preferences.getShouldTimerBeRunning()) {
                     Log.d("Timer", "Timer should not be running: cancelling timer " + Long.toString(id));
                     stop();
                     return;
                 }
 
-                long runningTimerId = myUtils.getTimerId();
+                long runningTimerId = preferences.getTimerId();
 
                 if (runningTimerId > id) {
                     Log.d("Timer", "Stopping timer with outdated id " + Long.toString(id));
@@ -188,12 +184,12 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (runningTimerId < id) {
-                    myUtils.setTimerId(id);
+                    preferences.setTimerId(id);
                 }
 
                 Log.d("Timer", "This id=" + Long.toString(id) + " " + "; runningTimerId=" + Long.toString(runningTimerId));
 
-                if (!myUtils.isNowSafe() /* Critical and Danger zones */) {
+                if (!kernel.isNowSafe() /* Critical and Danger zones */) {
                     UsageStatsManager mUsageStatsManager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
                     long time = System.currentTimeMillis();
                     long millisec = 60000;
@@ -210,7 +206,7 @@ public class MainActivity extends AppCompatActivity {
                         Log.d("Timer", "Empty usage stats");
                     } else {
                         String pkgName = stats.get(0).getPackageName();
-                        if (pkgName != null && !pkgName.equals(getPackageName()) && !StaticProcessList.fromSettings(myUtils).isPackageAllowed(pkgName)) {
+                        if (pkgName != null && !pkgName.equals(getPackageName()) && !StaticProcessList.fromPreferences(kernel, preferences).isPackageAllowed(pkgName)) {
                             Log.w("Timer", "Last is " + pkgName);
                             Log.w("Timer", "BRINGING TO FRONT");
                             bringToFront();
@@ -230,7 +226,7 @@ public class MainActivity extends AppCompatActivity {
             final boolean alreadyOnHome =
                     ((intent.getFlags() & Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
                             != Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);
-            myUtils.runAnotherHomeLauncher();
+            kernel.runAnotherHomeLauncher();
         }
     }
 
@@ -290,15 +286,16 @@ public class MainActivity extends AppCompatActivity {
         mainActivityContainer.setVisibility(View.GONE);
 
         final DevicePolicyManager devicePolicyManager = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
-        final ComponentName componentName = new ComponentName(this, MyAdmin.class);
+        final ComponentName componentName = new ComponentName(this, DeviceAdmin.class);
         final Context context = this;
-        myUtils = new MyUtils(context);
+        kernel = new Kernel(context);
+        preferences = new Preferences(context);
 
         CheckBox smartLockCheck = (CheckBox) findViewById(R.id.smartLockCheck);
         smartLockCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                myUtils.setSmartLockEnabled(b);
+                preferences.setSmartLockEnabled(b);
                 if (b) {
                     ensureAllRunning();
                 }
@@ -310,7 +307,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 RadioGroup homeLaunchersGroup = (RadioGroup) findViewById(R.id.homeLaunchersGroup);
                 homeLaunchersGroup.setOrientation(LinearLayout.VERTICAL);
-                String selectedHomeLauncher = myUtils.getHomeLauncher();
+                String selectedHomeLauncher = preferences.getHomeLauncher();
 
                 int count = homeLaunchersGroup.getChildCount();
                 if (count > 0) {
@@ -331,7 +328,7 @@ public class MainActivity extends AppCompatActivity {
                         @Override
                         public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
                             if (b) {
-                                myUtils.setHomeLauncher(btn.getText().toString());
+                                preferences.setHomeLauncher(btn.getText().toString());
                             }
                         }
                     });
@@ -364,7 +361,7 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.showLogFilePathButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Toast.makeText(context, myUtils.getLogFile().toString(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, preferences.getLogFile().toString(), Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -419,10 +416,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 EditText processListView = (EditText) findViewById(R.id.editKillProcessList);
-                processListView.setText(myUtils.getDangerProcessesString());
+                processListView.setText(preferences.getDangerProcessesString());
 
                 EditText editWhiteList = (EditText) findViewById(R.id.editWhiteList);
-                editWhiteList.setText(myUtils.getCriticalProcessesString());
+                editWhiteList.setText(preferences.getCriticalProcessesString());
             }
         });
 
@@ -432,10 +429,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 EditText processListView = (EditText) findViewById(R.id.editKillProcessList);
-                myUtils.setDangerProcessesString(processListView.getText().toString());
+                preferences.setDangerProcessesString(processListView.getText().toString());
 
                 EditText editWhiteList = (EditText) findViewById(R.id.editWhiteList);
-                myUtils.setCriticalProcessesString(editWhiteList.getText().toString());
+                preferences.setCriticalProcessesString(editWhiteList.getText().toString());
             }
         });
 
@@ -469,7 +466,7 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.startTimerButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                myUtils.setShouldTimerBeRunning(true);
+                preferences.setShouldTimerBeRunning(true);
                 runTimer();
             }
         });
@@ -477,7 +474,7 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.stopTimerButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                myUtils.setShouldTimerBeRunning(false);
+                preferences.setShouldTimerBeRunning(false);
             }
         });
 
@@ -510,7 +507,7 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.lockFromServiceButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent i = new Intent(context, MyService.class);
+                Intent i = new Intent(context, RepeatSmartlockService.class);
                 i.putExtra("LockNow", true);
                 startService(i);
             }
@@ -527,7 +524,7 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.stopCronjobButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                WorkManager.getInstance().cancelUniqueWork(MyWorker.class.getName());
+                WorkManager.getInstance().cancelUniqueWork(RepeatSmartlockWorker.class.getName());
                 Toast.makeText(view.getContext(), "Stopped daemon", Toast.LENGTH_SHORT).show();
             }
         });
@@ -535,7 +532,7 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.startAlarmButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                AlarmReceiver.setAlarm(context);
+                RepeatSmartlockAlarm.setAlarm(context);
                 Toast.makeText(view.getContext(), "Started alarm job", Toast.LENGTH_SHORT).show();
             }
         });
@@ -543,7 +540,7 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.stopAlarmButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                AlarmReceiver.cancelAlarm(context);
+                RepeatSmartlockAlarm.cancelAlarm(context);
                 Toast.makeText(view.getContext(), "Stopped alarm job", Toast.LENGTH_SHORT).show();
             }
         });
@@ -557,7 +554,7 @@ public class MainActivity extends AppCompatActivity {
                 sb.append("Allow usage stats: ???\n");
 
                 sb.append("Home Launcher: ");
-                String hl = myUtils.getHomeLauncher();
+                String hl = preferences.getHomeLauncher();
                 if (hl != null) {
                     sb.append(hl);
                 }
@@ -567,14 +564,14 @@ public class MainActivity extends AppCompatActivity {
                 sb.append(isMyAppLauncherDefault()).append("\n");
 
                 sb.append("Admin: ");
-                if (MyAdmin.isEnabled(context)) {
+                if (DeviceAdmin.isEnabled(context)) {
                     sb.append("ENABLED");
                 }
                 sb.append("\n");
 
                 sb.append("Periodic daemon: ");
                 try {
-                    List<WorkInfo> infos = WorkManager.getInstance().getWorkInfosForUniqueWork(MyWorker.class.getName()).get();
+                    List<WorkInfo> infos = WorkManager.getInstance().getWorkInfosForUniqueWork(RepeatSmartlockWorker.class.getName()).get();
                     for (WorkInfo info : infos) {
                         sb.append(info.getState().toString());
                     }
@@ -585,7 +582,7 @@ public class MainActivity extends AppCompatActivity {
                 sb.append("\n");
 
                 sb.append("Some alarm: ");
-                if (AlarmReceiver.isSomeAlarmSet(context)) {
+                if (RepeatSmartlockAlarm.isSomeAlarmSet(context)) {
                     sb.append("SET");
                 }
                 sb.append("\n");
@@ -603,7 +600,7 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.anotherHomeButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                myUtils.runAnotherHomeLauncher();
+                kernel.runAnotherHomeLauncher();
             }
         });
 
@@ -648,17 +645,17 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 String safeTime = ((EditText) findViewById(R.id.editSafeTime)).getText().toString();
-                if (!myUtils.setSafeTime(safeTime)) {
+                if (!preferences.setSafeTime(safeTime)) {
                     Toast.makeText(view.getContext(), "ERROR setting safe time", Toast.LENGTH_SHORT).show();
                 }
 
                 String dangerTime = ((EditText) findViewById(R.id.editDangerTime)).getText().toString();
-                if (!myUtils.setDangerTime(dangerTime)) {
+                if (!preferences.setDangerTime(dangerTime)) {
                     Toast.makeText(view.getContext(), "ERROR setting danger time", Toast.LENGTH_SHORT).show();
                 }
 
                 String criticalTime = ((EditText) findViewById(R.id.editCriticalTime)).getText().toString();
-                if (!myUtils.setCriticalTime(criticalTime)) {
+                if (!preferences.setCriticalTime(criticalTime)) {
                     Toast.makeText(view.getContext(), "ERROR setting critical time", Toast.LENGTH_SHORT).show();
                 }
             }
@@ -667,9 +664,9 @@ public class MainActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.loadSettingsButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                ((EditText) findViewById(R.id.editSafeTime)).setText(  myUtils.getSafeTime());
-                ((EditText) findViewById(R.id.editDangerTime)).setText(myUtils.getDangerTime());
-                ((EditText) findViewById(R.id.editCriticalTime)).setText(myUtils.getCriticalTime());
+                ((EditText) findViewById(R.id.editSafeTime)).setText(preferences.getSafeTime());
+                ((EditText) findViewById(R.id.editDangerTime)).setText(preferences.getDangerTime());
+                ((EditText) findViewById(R.id.editCriticalTime)).setText(preferences.getCriticalTime());
             }
         });
 

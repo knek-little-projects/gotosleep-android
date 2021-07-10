@@ -13,7 +13,7 @@ import androidx.annotation.NonNull;
 import static android.content.Context.DEVICE_POLICY_SERVICE;
 
 
-public class MyAdmin extends DeviceAdminReceiver {
+public class DeviceAdmin extends DeviceAdminReceiver {
 
     @Override
     public void onEnabled(@NonNull Context context, @NonNull Intent intent) {
@@ -27,7 +27,7 @@ public class MyAdmin extends DeviceAdminReceiver {
 
     static public boolean isEnabled(Context context) {
         DevicePolicyManager devicePolicyManager = (DevicePolicyManager) context.getSystemService(DEVICE_POLICY_SERVICE);
-        final ComponentName componentName = new ComponentName(context, MyAdmin.class);
+        final ComponentName componentName = new ComponentName(context, DeviceAdmin.class);
         return devicePolicyManager.isAdminActive(componentName);
     }
 

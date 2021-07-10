@@ -6,17 +6,16 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
-import android.widget.Button;
 
 import java.util.Calendar;
 
-public class AlarmReceiver extends BroadcastReceiver {
+public class RepeatSmartlockAlarm extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        MyUtils myUtils = new MyUtils(context);
-        myUtils.log("AlarmReceiver.onReceive: " + intent.toString());
+        Kernel kernel = new Kernel(context);
+        kernel.log("AlarmReceiver.onReceive: " + intent.toString());
 
-        Intent i = new Intent(context, MyService.class);
+        Intent i = new Intent(context, RepeatSmartlockService.class);
         i.putExtra("caller", "AlarmManager");
         context.startService(i);
     }
@@ -24,11 +23,11 @@ public class AlarmReceiver extends BroadcastReceiver {
     static public void setAlarm(Context context) {
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 
-        Intent intent = new Intent(context, AlarmReceiver.class);
+        Intent intent = new Intent(context, RepeatSmartlockAlarm.class);
         PendingIntent alarmIntent = PendingIntent.getBroadcast(context, 0, intent, 0);
 
         Calendar now = Calendar.getInstance();
-        long criticalTimeInMillis = (new MyUtils(context)).getNextCriticalTimeInMillis(now);
+        long criticalTimeInMillis = (new Kernel(context)).getNextCriticalTimeInMillis(now);
         Log.w("Alarm will fire after (millis)", Long.toString(criticalTimeInMillis - now.getTimeInMillis()));
         alarmManager.setInexactRepeating(
                 AlarmManager.RTC,
@@ -39,14 +38,14 @@ public class AlarmReceiver extends BroadcastReceiver {
     }
 
     static public boolean isSomeAlarmSet(Context context) {
-        Intent intent = new Intent(context, AlarmReceiver.class);
+        Intent intent = new Intent(context, RepeatSmartlockAlarm.class);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_NO_CREATE);
         return  pendingIntent != null;
     }
 
     static public void cancelAlarm(Context context) {
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        Intent intent = new Intent(context, AlarmReceiver.class);
+        Intent intent = new Intent(context, RepeatSmartlockAlarm.class);
         PendingIntent sender = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         alarmManager.cancel(sender);
         sender.cancel();
