@@ -1,5 +1,6 @@
 package com.example.myapplication;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
@@ -31,6 +32,7 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -41,6 +43,8 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class MainActivity extends AppCompatActivity {
     public static final int RESULT_ENABLE = 11;
@@ -436,6 +440,35 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        ((Button) findViewById(R.id.testActivityButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                final PackageManager pm = getPackageManager();
+                final ArrayList<String> apps = new ArrayList<>();
+                for (ApplicationInfo applicationInfo : pm.getInstalledApplications(0)) {
+//                    final Intent intent = pm.getLaunchIntentForPackage(pkg.packageName);
+//                    if (intent == null) {
+//                        continue;
+//                    }
+
+                    apps.add(applicationInfo.packageName);
+                }
+
+                Intent intent = new Intent(context, SelectMultipleActivities.class);
+
+                ArrayList<String> selectedApps = new ArrayList<>();
+                selectedApps.add("a");
+                selectedApps.add("b");
+                selectedApps.add("com.google.android.youtube");
+                selectedApps.add("com.android.documentsui");
+
+                intent.putExtra("selectedApps", selectedApps);
+                intent.putExtra("totalApps", apps);
+                startActivityForResult(intent, 0);
+            }
+        });
+
+
         ((Button) findViewById(R.id.killProcessListButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -671,5 +704,25 @@ public class MainActivity extends AppCompatActivity {
         });
 
         ((Button) findViewById(R.id.loadSettingsButton)).performClick();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (data == null) {
+            return;
+        }
+
+        if (data.hasExtra("selectedApps")) {
+            if (resultCode == 0) {
+                Toast.makeText(getApplicationContext(), "Cancelled", Toast.LENGTH_SHORT).show();
+            } else {
+                ArrayList<String> selectedApps = data.getStringArrayListExtra("selectedApps");
+                if (selectedApps != null) {
+                    Toast.makeText(getApplicationContext(), "New set: " + selectedApps.toString(), Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
     }
 }
