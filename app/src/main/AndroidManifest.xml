@@ -17,6 +17,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <activity android:name=".ControlActivity"></activity>
         <activity android:name=".SelectMultipleActivities" />
         <activity
             android:name=".FakeLauncherActivity"
@@ -28,7 +29,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-        <activity android:name=".DangerZone" />
+        <activity android:name=".DangerZoneActivity" />
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTask">

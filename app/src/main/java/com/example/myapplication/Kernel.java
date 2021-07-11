@@ -4,6 +4,8 @@ import android.app.usage.UsageStats;
 import android.app.usage.UsageStatsManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -11,17 +13,21 @@ import androidx.annotation.NonNull;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.TimeZone;
 
 public class Kernel {
+
+    static private final Boolean DEBUG = false;
+    static private final Boolean DEBUG_SAFE_TIME = false;
+    static private final Boolean DEBUG_DANGER_TIME = false;
+    static private final Boolean DEBUG_CRITICAL_TIME = false;
+
     private Context context;
     private Preferences preferences;
 
@@ -50,7 +56,7 @@ public class Kernel {
     }
 
     public void showAppSelector() {
-        context.startActivity(new Intent(context, DangerZone.class));
+        context.startActivity(new Intent(context, DangerZoneActivity.class));
     }
 
     public Preferences getPreferences() {
@@ -58,17 +64,26 @@ public class Kernel {
     }
 
     public boolean isNowSafe() {
-//        return false;
+        if (DEBUG) {
+            return DEBUG_SAFE_TIME;
+        }
+
         return isTimeSeq(preferences.getSafeTime(), getNow(), preferences.getDangerTime());
     }
 
     public boolean isNowDanger() {
-//        return false;
+        if (DEBUG) {
+            return DEBUG_DANGER_TIME;
+        }
+
         return isTimeSeq(preferences.getDangerTime(), getNow(), preferences.getCriticalTime());
     }
 
     public boolean isNowCritical() {
-//        return true;
+        if (DEBUG) {
+            return DEBUG_CRITICAL_TIME;
+        }
+
         return isTimeSeq(preferences.getCriticalTime(), getNow(), preferences.getSafeTime());
     }
 
@@ -154,6 +169,15 @@ public class Kernel {
         }
 
         return false;
+    }
+
+    public ArrayList<String> getPackageNameList() {
+        final PackageManager pm = context.getPackageManager();
+        final ArrayList<String> apps = new ArrayList<>();
+        for (ApplicationInfo applicationInfo : pm.getInstalledApplications(0)) {
+            apps.add(applicationInfo.packageName);
+        }
+        return apps;
     }
 
     public void smartLock(String caller) {

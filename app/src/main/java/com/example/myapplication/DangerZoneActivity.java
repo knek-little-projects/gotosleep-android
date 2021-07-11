@@ -19,10 +19,11 @@ import android.widget.LinearLayout;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.List;
 
-public class DangerZone extends AppCompatActivity {
+public class DangerZoneActivity extends AppCompatActivity {
     private EditText editAppLaunchSearch;
     private LinearLayout appLaunchContainer;
     private LinearLayout container;
@@ -50,6 +51,21 @@ public class DangerZone extends AppCompatActivity {
                     }
                 }
         );
+
+        ((Button) findViewById(R.id.failsafePasswordButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Preferences preferences = new Preferences(context);
+                TextView textView = (TextView) findViewById(R.id.failsafePasswordEdit);
+
+                if (preferences.checkFailsafePassword(textView.getText().toString())) {
+                    preferences.setSmartLockEnabled(false);
+                    Toast.makeText(context, "Smartlock disabled!", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(context, "Wrong password!", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
     }
 
     private void updateContainerVisibility() {

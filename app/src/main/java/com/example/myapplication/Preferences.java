@@ -2,10 +2,14 @@ package com.example.myapplication;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 
+import org.w3c.dom.Text;
+
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashSet;
@@ -17,7 +21,9 @@ public class Preferences {
     static public final String defaultCriticalTime = "23:00";
     static public final String defaultTimeZone = "Europe/Moscow";
     static public final String defaultLogFileName = "log.txt";
+    static public final String defaultFailsafePassword = "";
 
+    static private final String FAILSAFE_PASSWORD = "FAILSAFE_PASSWORD";
     static private final String SAFE_TIME = "safeTime";
     static private final String DANGER_TIME = "dangerTimer";
     static private final String CRIT_TIME = "criticalTime";
@@ -33,6 +39,20 @@ public class Preferences {
 
     public Preferences(@NonNull Context context) {
         this.context = context;
+    }
+
+    public void setFailsafePassword(String password) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putString(FAILSAFE_PASSWORD, password);
+        editor.apply();
+    }
+
+    public String getFailsafePassword() {
+        return getPreferences().getString(FAILSAFE_PASSWORD, defaultFailsafePassword);
+    }
+
+    public Boolean checkFailsafePassword(String password) {
+        return password.trim().equals(getFailsafePassword().trim());
     }
 
     public Set<String> getDangerProcessesSet() {
@@ -72,15 +92,27 @@ public class Preferences {
         return getPreferences().getString(DANGER_PROCESSES, "");
     }
 
-    public void setDangerProcessesString(String s) {
+    public void setDangerProcesses(String s) {
         SharedPreferences.Editor editor = getPreferences().edit();
         editor.putString(DANGER_PROCESSES, s);
         editor.apply();
     }
 
-    public void setCriticalProcessesString(String s) {
+    public void setDangerProcesses(ArrayList<String> items) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putString(DANGER_PROCESSES, TextUtils.join("\n", items));
+        editor.apply();
+    }
+
+    public void setCriticalProcesses(String s) {
         SharedPreferences.Editor editor = getPreferences().edit();
         editor.putString(CRITICAL_PROCESSES, s);
+        editor.apply();
+    }
+
+    public void setCriticalProcesses(ArrayList<String> items) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putString(CRITICAL_PROCESSES, TextUtils.join("\n", items));
         editor.apply();
     }
 
