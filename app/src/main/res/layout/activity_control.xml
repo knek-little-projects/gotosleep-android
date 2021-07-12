@@ -153,14 +153,12 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="TERC check allowed activity URL:"
-                    />
+                    android:text="TERC check allowed activity URL:" />
 
                 <EditText
                     android:id="@+id/editTercActivityURL"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                />
+                    android:layout_height="wrap_content" />
 
                 <Button
                     android:id="@+id/debugRequestActivityURL"
@@ -416,24 +414,61 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Failsafe password:" />
 
-                <EditText
-                    android:id="@+id/failsafePasswordEdit"
+                <CheckBox
+                    android:id="@+id/disablePassword"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="#E4BCBC"
-                    android:ems="10"
-                    android:gravity="start|top" />
+                    android:text="Disable password period" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/disablePasswordStart"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"/>
+
+                    <EditText
+                        android:id="@+id/disablePasswordEnd"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
 
                 <Button
-                    android:id="@+id/failsafePasswordButton"
+                    android:id="@+id/disablePasswordSaveButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Save new failsafe password" />
+                    android:text="SAVE DISABLED PERIODS" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    >
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Failsafe password:" />
+
+                    <EditText
+                        android:id="@+id/failsafePasswordEdit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#E4BCBC"
+                        android:ems="10"
+                        android:gravity="start|top" />
+
+                    <Button
+                        android:id="@+id/failsafePasswordButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Save new failsafe password" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
 

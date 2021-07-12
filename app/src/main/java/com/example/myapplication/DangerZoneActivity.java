@@ -69,11 +69,12 @@ public class DangerZoneActivity extends AppCompatActivity {
     }
 
     private void updateContainerVisibility() {
-//        if (myUtils.isNowCritical()) {
-//            container.setVisibility(View.GONE);
-//        } else {
-//            container.setVisibility(View.VISIBLE);
-//        }
+        LinearLayout disablePasswordContainer = (LinearLayout) findViewById(R.id.disablePasswordContainer);
+        if (kernel.isPasswordDisabled()) {
+            disablePasswordContainer.setVisibility(View.GONE);
+        } else {
+            disablePasswordContainer.setVisibility(View.VISIBLE);
+        }
     }
 
     @Override

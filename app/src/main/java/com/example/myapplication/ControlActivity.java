@@ -69,6 +69,15 @@ public class ControlActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
+        final CheckBox doesPasswordHasDisablePeriod = (CheckBox) findViewById(R.id.disablePassword);
+        doesPasswordHasDisablePeriod.setChecked(preferences.doesPasswordHasDisablePeriod());
+
+        final EditText disablePasswordStart = (EditText) findViewById(R.id.disablePasswordStart);
+        disablePasswordStart.setText(preferences.getPasswordDisablePeriodStart());
+
+        final EditText disablePasswordEnd = (EditText) findViewById(R.id.disablePasswordEnd);
+        disablePasswordEnd.setText(preferences.getPasswordDisablePeriodEnd());
+
         TextView failsafePasswordEdit = (TextView) findViewById(R.id.failsafePasswordEdit);
         failsafePasswordEdit.setText(preferences.getFailsafePassword());
 
@@ -277,20 +286,44 @@ public class ControlActivity extends AppCompatActivity {
         packageManager.setComponentEnabledSetting(componentName, PackageManager.COMPONENT_ENABLED_STATE_DEFAULT, PackageManager.DONT_KILL_APP);
     }
 
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_control);
 
+        final Context context = this;
+        kernel = new Kernel(context);
+        preferences = new Preferences(context);
+
+        final CheckBox doesPasswordHasDisablePeriod = (CheckBox) findViewById(R.id.disablePassword);
+        final EditText disablePasswordStart = (EditText) findViewById(R.id.disablePasswordStart);
+        final EditText disablePasswordEnd = (EditText) findViewById(R.id.disablePasswordEnd);
+        Button disablePasswordSaveButton = (Button) findViewById(R.id.disablePasswordSaveButton);
+        disablePasswordSaveButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (preferences.setPasswordDisablePeriodStart(disablePasswordStart.getText().toString()) && preferences.setPasswordDisablePeriodEnd(disablePasswordEnd.getText().toString())) {
+                    preferences.setPasswordHasDisablePeriod(doesPasswordHasDisablePeriod.isChecked());
+                } else {
+                    preferences.setSmartLockEnabled(false);
+                    Toast.makeText(context, "ERROR", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        EditText passwordDisablePeriodStart = (EditText) findViewById(R.id.disablePasswordStart);
+        passwordDisablePeriodStart.setText(preferences.getPasswordDisablePeriodStart());
+
+        EditText passwordDisablePeriodEnd = (EditText) findViewById(R.id.disablePasswordEnd);
+        passwordDisablePeriodEnd.setText(preferences.getPasswordDisablePeriodEnd());
 
         View mainActivityContainer = (View) findViewById(R.id.mainActivityContainer);
         mainActivityContainer.setVisibility(View.GONE);
 
         final DevicePolicyManager devicePolicyManager = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
         final ComponentName componentName = new ComponentName(this, DeviceAdmin.class);
-        final Context context = this;
-        kernel = new Kernel(context);
-        preferences = new Preferences(context);
 
         CheckBox smartLockCheck = (CheckBox) findViewById(R.id.smartLockCheck);
         smartLockCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {

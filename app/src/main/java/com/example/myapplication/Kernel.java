@@ -224,7 +224,14 @@ public class Kernel {
         return getPeriod() == CRITICAL_PERIOD;
     }
 
-    static private boolean isTimeSeq(String a, String b, String c) {
+    public boolean isPasswordDisabled() {
+        if (preferences.doesPasswordHasDisablePeriod()) {
+            return isTimeSeq(preferences.getPasswordDisablePeriodStart(), getNow(), preferences.getPasswordDisablePeriodEnd());
+        }
+        return false;
+    }
+
+    static public boolean isTimeSeq(String a, String b, String c) {
         if (a.compareTo(c) <= 0) {
             return a.compareTo(b) <= 0 && b.compareTo(c) < 0;
         } else {

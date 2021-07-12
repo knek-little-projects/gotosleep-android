@@ -47,11 +47,40 @@ public class Preferences {
     static private final String LAST_TERC_REQUEST_TIME = "LAST_TERC_REQUEST_TIME";
     static private final String CUR_PERIOD = "CUR_PERIOD";
     static private final String PREV_PERIOD = "PREV_PERIOD";
+    static private final String PASSWORD_DISABLE_PERIOD_ENABLED = "PASSWORD_DISABLE_PERIOD_ENABLED";
+    static private final String PASSWORD_DISABLE_PERIOD_START = "PASSWORD_DISABLE_PERIOD_START";
+    static private final String PASSWORD_DISABLE_PERIOD_END = "PASSWORD_DISABLE_PERIOD_END";
 
     private Context context;
 
     public Preferences(@NonNull Context context) {
         this.context = context;
+    }
+
+    public boolean doesPasswordHasDisablePeriod() {
+        return getPreferences().getBoolean(PASSWORD_DISABLE_PERIOD_ENABLED, false);
+    }
+
+    public void setPasswordHasDisablePeriod(boolean b) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putBoolean(PASSWORD_DISABLE_PERIOD_ENABLED, b);
+        editor.apply();
+    }
+
+    public boolean setPasswordDisablePeriodStart(@NonNull String val) {
+        return setTimeLevel(PASSWORD_DISABLE_PERIOD_START, val);
+    }
+
+    public boolean setPasswordDisablePeriodEnd(@NonNull String val) {
+        return setTimeLevel(PASSWORD_DISABLE_PERIOD_END, val);
+    }
+
+    public String getPasswordDisablePeriodStart() {
+        return getPreferences().getString(PASSWORD_DISABLE_PERIOD_START, "00:00");
+    }
+
+    public String getPasswordDisablePeriodEnd() {
+        return getPreferences().getString(PASSWORD_DISABLE_PERIOD_END, "00:00");
     }
 
     public long getLastTERCRequestTime() {
@@ -237,14 +266,26 @@ public class Preferences {
     }
 
     public boolean setTimeLevel(String level, String hhmm) {
-        if (hhmm.matches("[0-9]{2}:[0-9]{2}")) {
-            SharedPreferences.Editor editor = getPreferences().edit();
-            editor.putString(level, hhmm);
-            editor.apply();
-            return true;
-        } else {
+        if (hhmm.length() == 4) {
+            hhmm = "0" + hhmm;
+        }
+
+        if (!hhmm.matches("[0-9]{2}:[0-9]{2}")) {
             return false;
         }
+
+        String[] items = hhmm.split(":");
+        int hh = Integer.parseInt(items[0]);
+        int mm = Integer.parseInt(items[1]);
+
+        if (!(0 <= hh && hh <= 23 && 0 <= mm && mm <= 59)) {
+            return false;
+        }
+
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putString(level, hhmm);
+        editor.apply();
+        return true;
     }
 
     public boolean setCriticalTime(String hhmm) {
