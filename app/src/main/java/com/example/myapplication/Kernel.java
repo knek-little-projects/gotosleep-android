@@ -7,11 +7,24 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
+import com.android.volley.DefaultRetryPolicy;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -21,12 +34,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
+import javax.net.ssl.HttpsURLConnection;
+
 public class Kernel {
 
     static private final Boolean DEBUG = false;
-    static private final Boolean DEBUG_SAFE_TIME = false;
-    static private final Boolean DEBUG_DANGER_TIME = false;
-    static private final Boolean DEBUG_CRITICAL_TIME = false;
+    static private final Boolean DEBUG_TERC_AVAILABLE_ACTIVITY = false;
+    static private final int DEBUG_PERIOD = 0;
 
     private Context context;
     private Preferences preferences;
@@ -63,28 +77,151 @@ public class Kernel {
         return preferences;
     }
 
-    public boolean isNowSafe() {
+    //
+//    private String httpRequestString(URL url) {
+//        try {
+//            HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+//            try {
+//                InputStream inputStream = new BufferedInputStream(urlConnection.getInputStream());
+//                return inputStream.toString();
+//            } finally {
+//                urlConnection.disconnect();
+//            }
+//        } catch (java.io.IOException e) {
+//        }
+//        return null;
+//    }
+//
+//    private String httpsRequestString(URL url) {
+//        try {
+//            HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
+//            try {
+//                InputStream inputStream = new BufferedInputStream(urlConnection.getInputStream());
+//                return inputStream.toString();
+//            } finally {
+//                urlConnection.disconnect();
+//            }
+//        } catch (java.io.IOException e) {
+//        }
+//        return null;
+//    }
+//
+//    private String requestString(String url) {
+//        if (url.startsWith("http:")) {
+//            return httpRequestString(new URL(url));
+//        } else {
+//            return httpsRequestString(new URL(url));
+//        }
+//    }
+    private void updateTercActivityAvailable() {
+        updateTercActivityAvailable(5);
+    }
+
+    private void updateTercActivityAvailable(final int retries) {
+        String url = preferences.getTERCActivityURL();
+        Log.d("updateTercActivityAvailable", "Request " + url);
+        RequestQueue requestQueue = Volley.newRequestQueue(context);
+        StringRequest stringRequest = new StringRequest(
+                Request.Method.GET,
+                url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        Log.d("updateTercActivityAvailable", response);
+                        preferences.setTercActivityAllowed(response.equals("true"));
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        if (retries > 0) {
+                            updateTercActivityAvailable(retries - 1);
+                        } else {
+                            Log.e("updateTercActivityAvailable", error.toString());
+                            preferences.setTercActivityAllowed(false);
+                        }
+                    }
+                }
+        );
+        stringRequest.setRetryPolicy(new DefaultRetryPolicy(
+                5000,
+                5,
+                DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+
+        requestQueue.add(stringRequest);
+    }
+
+    public boolean getAndUpdateTercAvailableActivity() {
         if (DEBUG) {
-            return DEBUG_SAFE_TIME;
+            return DEBUG_TERC_AVAILABLE_ACTIVITY;
         }
 
-        return isTimeSeq(preferences.getSafeTime(), getNow(), preferences.getDangerTime());
+        long now = System.currentTimeMillis();
+        if (now - preferences.getLastTERCRequestTime() > 10000) {  // TODO
+            preferences.setLastTercRequestTime(now);
+            updateTercActivityAvailable();
+        }
+
+        return preferences.isTERCActivityAllowed();
+    }
+
+    static public int SAFE_PERIOD = 0;
+    static public int DANGER_PERIOD = 1;
+    static public int CRITICAL_PERIOD = 2;
+
+    public int getPeriod() {
+        if (DEBUG) {
+            return DEBUG_PERIOD;
+        }
+
+        String now = getNow();
+
+        if (!preferences.isSmartLockEnabled()) {
+            return SAFE_PERIOD;
+        }
+
+        if (isTimeSeq(preferences.getSafeTime(), now, preferences.getDangerTime())) {
+            return SAFE_PERIOD;
+        }
+
+        if (preferences.isTercUse()) {
+            Log.d("kernel", "Using TERC");
+            if (isTimeSeq(preferences.getCriticalTime(), now, preferences.getSafeTime())) {
+                Log.d("kernel", "Critical time period: returning crit");
+                return CRITICAL_PERIOD;
+            } else {
+                if (getAndUpdateTercAvailableActivity()) {
+                    Log.d("kernel", "Relax is available: returning danger");
+                    return DANGER_PERIOD;
+                } else {
+                    Log.d("kernel", "Relax is forbidden: returning crit");
+                    return CRITICAL_PERIOD;
+                }
+            }
+        } else {
+            Log.d("kernel", "No TERC");
+
+            if (isTimeSeq(preferences.getDangerTime(), now, preferences.getCriticalTime())) {
+                return DANGER_PERIOD;
+            }
+            if (isTimeSeq(preferences.getCriticalTime(), now, preferences.getSafeTime())) {
+                return CRITICAL_PERIOD;
+            }
+        }
+
+        return SAFE_PERIOD;
+    }
+
+    public boolean isNowSafe() {
+        return getPeriod() == SAFE_PERIOD;
     }
 
     public boolean isNowDanger() {
-        if (DEBUG) {
-            return DEBUG_DANGER_TIME;
-        }
-
-        return isTimeSeq(preferences.getDangerTime(), getNow(), preferences.getCriticalTime());
+        return getPeriod() == DANGER_PERIOD;
     }
 
     public boolean isNowCritical() {
-        if (DEBUG) {
-            return DEBUG_CRITICAL_TIME;
-        }
-
-        return isTimeSeq(preferences.getCriticalTime(), getNow(), preferences.getSafeTime());
+        return getPeriod() == CRITICAL_PERIOD;
     }
 
     static private boolean isTimeSeq(String a, String b, String c) {
@@ -181,23 +318,54 @@ public class Kernel {
     }
 
     public void smartLock(String caller) {
-        log("Smartlock: call from " + (caller == null ? "NULL" : caller));
+        Log.d("kernel", "Smartlock: call from " + (caller == null ? "NULL" : caller));
 
         boolean doLock = false;
 
-        if (isNowCritical()) {
-            log("Smartlock: Time is CRITICAL");
+//        int period = getPeriod();
+
+//        if (period == CRITICAL_PERIOD) {
+//            log("Smartlock: Time is CRITICAL");
+//
+//            if (preferences.isFirstCriticalTimeToday()) {
+//                log("Smartlock: First critical time today");
+//                preferences.updateLastCriticalTime();
+//                doLock = true;
+//            } else {
+//                if (isForbiddenAppRunning()) {
+//                    log("Smartlock: forbidden app running: locking!");
+//                    doLock = true;
+//                }
+//            }
+//        }
+        int newPeriod = getPeriod();
+        Log.d("kernel", "Period: " + Integer.toString(newPeriod));
+
+        if (newPeriod == CRITICAL_PERIOD) {
+            Log.d("kernel", "Smartlock: Time is CRITICAL");
 
             if (preferences.isFirstCriticalTimeToday()) {
-                log("Smartlock: First critical time today");
+                Log.d("kernel", "Smartlock: First critical time today");
                 preferences.updateLastCriticalTime();
                 doLock = true;
-            } else {
-                if (isForbiddenAppRunning()) {
-                    log("Smartlock: forbidden app running: locking!");
-                    doLock = true;
-                }
             }
+        }
+
+        int lastPeriod = preferences.getCurPeriod();
+        if (lastPeriod != newPeriod) {
+            preferences.updatePeriod(newPeriod);
+            if (lastPeriod == SAFE_PERIOD) {
+                Log.d("kernel", "Smartlock: change of period: locking now: " + Integer.toString(lastPeriod) + Integer.toString(newPeriod));
+                doLock = true;
+            } else {
+                Log.d("kernel", "Smartlock: change of period to SAFE. Doing nothing");
+            }
+        } else {
+            Log.d("kernel", "Smartlock: same period: " + Integer.toString(lastPeriod));
+        }
+
+        if (newPeriod != SAFE_PERIOD && isForbiddenAppRunning()) {
+            bringToFront();
         }
 
         if (doLock) {
@@ -206,8 +374,15 @@ public class Kernel {
             if (DeviceAdmin.isEnabled(context)) {
                 DeviceAdmin.lockNow(context);
             } else {
-                log("ERROR: ADMIN IS DISABLED");
+                Log.e("kernel", "ERROR: ADMIN IS DISABLED");
             }
         }
     }
+
+    public void bringToFront() {
+        Intent intent = new Intent(context.getApplicationContext(), MainActivity.class);
+        context.getApplicationContext().startActivity(intent);
+    }
+
+
 }

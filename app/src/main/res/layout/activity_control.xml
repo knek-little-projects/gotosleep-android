@@ -31,6 +31,12 @@
                 android:layout_height="wrap_content"
                 android:text="ENABLE SMART LOCK" />
 
+            <CheckBox
+                android:id="@+id/tercCheck"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="USE TERC" />
+
             <TextView
                 android:id="@+id/checkStatusLabel"
                 android:layout_width="match_parent"
@@ -138,6 +144,36 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Check usage stats access" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="TERC check allowed activity URL:"
+                    />
+
+                <EditText
+                    android:id="@+id/editTercActivityURL"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                />
+
+                <Button
+                    android:id="@+id/debugRequestActivityURL"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Request URL" />
+
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Timezone: MSC" />
 
             <TableLayout
                 android:layout_width="match_parent"
@@ -391,7 +427,7 @@
                     android:layout_height="wrap_content"
                     android:background="#E4BCBC"
                     android:ems="10"
-                    android:gravity="start|top"/>
+                    android:gravity="start|top" />
 
                 <Button
                     android:id="@+id/failsafePasswordButton"

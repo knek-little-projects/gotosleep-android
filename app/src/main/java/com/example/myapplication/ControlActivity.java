@@ -19,7 +19,10 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Bundle;
+import android.os.Debug;
 import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -31,6 +34,15 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+
+import org.w3c.dom.Text;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,8 +72,14 @@ public class ControlActivity extends AppCompatActivity {
         TextView failsafePasswordEdit = (TextView) findViewById(R.id.failsafePasswordEdit);
         failsafePasswordEdit.setText(preferences.getFailsafePassword());
 
+        TextView tercActivityURL = (TextView) findViewById(R.id.editTercActivityURL);
+        tercActivityURL.setText(preferences.getTERCActivityURL());
+
         CheckBox smartLockCheck = (CheckBox) findViewById(R.id.smartLockCheck);
         smartLockCheck.setChecked(preferences.isSmartLockEnabled());
+
+        CheckBox tercCheck = (CheckBox) findViewById(R.id.tercCheck);
+        tercCheck.setChecked(preferences.isTercUse());
 
         if (preferences.getShouldTimerBeRunning() && timer == null) {
             runTimer();
@@ -196,33 +214,7 @@ public class ControlActivity extends AppCompatActivity {
                 }
 
                 Log.d("Timer", "This id=" + Long.toString(id) + " " + "; runningTimerId=" + Long.toString(runningTimerId));
-
-                if (!kernel.isNowSafe() /* Critical and Danger zones */) {
-                    UsageStatsManager mUsageStatsManager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
-                    long time = System.currentTimeMillis();
-                    long millisec = 60000;
-                    List<UsageStats> stats = mUsageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - millisec, time);
-
-                    stats.sort(new Comparator<UsageStats>() {
-                        @Override
-                        public int compare(UsageStats a, UsageStats b) {
-                            return -Long.compare(a.getLastTimeUsed(), b.getLastTimeUsed());
-                        }
-                    });
-
-                    if (stats.isEmpty()) {
-                        Log.d("Timer", "Empty usage stats");
-                    } else {
-                        String pkgName = stats.get(0).getPackageName();
-                        if (pkgName != null && !pkgName.equals(getPackageName()) && !StaticProcessList.fromPreferences(kernel, preferences).isPackageAllowed(pkgName)) {
-                            Log.w("Timer", "Last is " + pkgName);
-                            Log.w("Timer", "BRINGING TO FRONT");
-                            bringToFront();
-                        } else {
-                            Log.d("Timer", "Last is " + pkgName);
-                        }
-                    }
-                }
+                kernel.smartLock("ControlActivityTimer");
             }
         }, 500, 500);
     }
@@ -308,6 +300,60 @@ public class ControlActivity extends AppCompatActivity {
                 if (b) {
                     ensureAllRunning();
                 }
+            }
+        });
+
+        CheckBox tercCheck = (CheckBox) findViewById(R.id.tercCheck);
+        tercCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                preferences.setTercUse(b);
+            }
+        });
+
+        final EditText tercActivityURL = (EditText) findViewById(R.id.editTercActivityURL);
+        tercActivityURL.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+                preferences.setTERCACtivityURL(tercActivityURL.getText().toString());
+            }
+        });
+
+        ((Button) findViewById(R.id.debugRequestActivityURL)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String url = preferences.getTERCActivityURL();
+                Log.d("qwe", "Request " + url);
+                RequestQueue requestQueue = Volley.newRequestQueue(getApplicationContext());
+                StringRequest stringRequest = new StringRequest(
+                        Request.Method.GET,
+                        url,
+                        new Response.Listener<String>() {
+                            @Override
+                            public void onResponse(String response) {
+                                Log.d("qwe", response);
+                                Toast.makeText(context, "Got response: " + response, Toast.LENGTH_SHORT).show();
+                            }
+                        },
+                        new Response.ErrorListener() {
+                            @Override
+                            public void onErrorResponse(VolleyError error) {
+                                Log.e("qwe", error.toString());
+                                Toast.makeText(context, "ERROR", Toast.LENGTH_SHORT).show();
+
+                            }
+                        }
+                );
+
+                requestQueue.add(stringRequest);
             }
         });
 

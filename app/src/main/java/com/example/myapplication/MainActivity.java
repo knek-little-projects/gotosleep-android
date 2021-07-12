@@ -195,33 +195,33 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 Log.d("Timer", "This id=" + Long.toString(id) + " " + "; runningTimerId=" + Long.toString(runningTimerId));
-
-                if (!kernel.isNowSafe() /* Critical and Danger zones */) {
-                    UsageStatsManager mUsageStatsManager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
-                    long time = System.currentTimeMillis();
-                    long millisec = 60000;
-                    List<UsageStats> stats = mUsageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - millisec, time);
-
-                    stats.sort(new Comparator<UsageStats>() {
-                        @Override
-                        public int compare(UsageStats a, UsageStats b) {
-                            return -Long.compare(a.getLastTimeUsed(), b.getLastTimeUsed());
-                        }
-                    });
-
-                    if (stats.isEmpty()) {
-                        Log.d("Timer", "Empty usage stats");
-                    } else {
-                        String pkgName = stats.get(0).getPackageName();
-                        if (pkgName != null && !pkgName.equals(getPackageName()) && !StaticProcessList.fromPreferences(kernel, preferences).isPackageAllowed(pkgName)) {
-                            Log.w("Timer", "Last is " + pkgName);
-                            Log.w("Timer", "BRINGING TO FRONT");
-                            bringToFront();
-                        } else {
-                            Log.d("Timer", "Last is " + pkgName);
-                        }
-                    }
-                }
+                kernel.smartLock("Timer");
+//                if (!kernel.isNowSafe() /* Critical and Danger zones */) {
+//                    UsageStatsManager mUsageStatsManager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
+//                    long time = System.currentTimeMillis();
+//                    long millisec = 60000;
+//                    List<UsageStats> stats = mUsageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - millisec, time);
+//
+//                    stats.sort(new Comparator<UsageStats>() {
+//                        @Override
+//                        public int compare(UsageStats a, UsageStats b) {
+//                            return -Long.compare(a.getLastTimeUsed(), b.getLastTimeUsed());
+//                        }
+//                    });
+//
+//                    if (stats.isEmpty()) {
+//                        Log.d("Timer", "Empty usage stats");
+//                    } else {
+//                        String pkgName = stats.get(0).getPackageName();
+//                        if (pkgName != null && !pkgName.equals(getPackageName()) && !StaticProcessList.fromPreferences(kernel, preferences).isPackageAllowed(pkgName)) {
+//                            Log.w("Timer", "Last is " + pkgName);
+//                            Log.w("Timer", "BRINGING TO FRONT");
+//                            bringToFront();
+//                        } else {
+//                            Log.d("Timer", "Last is " + pkgName);
+//                        }
+//                    }
+//                }
             }
         }, 500, 500);
     }

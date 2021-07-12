@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Preferences {
     static public final String defaultSafeTime = "05:00";
@@ -22,7 +24,15 @@ public class Preferences {
     static public final String defaultTimeZone = "Europe/Moscow";
     static public final String defaultLogFileName = "log.txt";
     static public final String defaultFailsafePassword = "";
+    static public final String defaultTERCActivityURL = "http://18.133.52.116:12345/check-allowed/activity";
+    static public final Boolean defaultUseTERC = false;
+    static public final Boolean defaultIsTERCActivityAllowed = false;
+    static public final int defaultCurPeriod = 0;
+    static public final int defaultPrevPeriod = 0;
 
+    static private final String TERC_USE = "TERC_USE";
+    static private final String TERC_IS_ACTIVITY_ALLOWED = "TERC_IS_ACTIVITY_ALLOWED";
+    static private final String TERC_ACTIVITY_URL = "TERC_ACTIVITY_URL1";
     static private final String FAILSAFE_PASSWORD = "FAILSAFE_PASSWORD";
     static private final String SAFE_TIME = "safeTime";
     static private final String DANGER_TIME = "dangerTimer";
@@ -34,11 +44,59 @@ public class Preferences {
     static private final String DANGER_PROCESSES = "killProcessList";
     static private final String CRITICAL_PROCESSES = "CRITICAL_PROCESSES";
     static private final String LAST_CRITICAL_TIME = "LAST_CRITICAL_TIME";
+    static private final String LAST_TERC_REQUEST_TIME = "LAST_TERC_REQUEST_TIME";
+    static private final String CUR_PERIOD = "CUR_PERIOD";
+    static private final String PREV_PERIOD = "PREV_PERIOD";
 
     private Context context;
 
     public Preferences(@NonNull Context context) {
         this.context = context;
+    }
+
+    public long getLastTERCRequestTime() {
+        return getPreferences().getLong(LAST_TERC_REQUEST_TIME, 0);
+    }
+
+    public void setLastTercRequestTime(long val) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putLong(LAST_TERC_REQUEST_TIME, val);
+        editor.apply();
+    }
+
+    public int getCurPeriod() {
+        return getPreferences().getInt(CUR_PERIOD, defaultCurPeriod);
+    }
+
+    public int getPrevPeriod() {
+        return getPreferences().getInt(PREV_PERIOD, defaultCurPeriod);
+    }
+
+    public void updatePeriod(int period) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putInt(PREV_PERIOD, getCurPeriod());
+        editor.putInt(CUR_PERIOD, period);
+        editor.apply();
+    }
+
+    public Boolean isTERCActivityAllowed() {
+        return getPreferences().getBoolean(TERC_IS_ACTIVITY_ALLOWED, defaultIsTERCActivityAllowed);
+    }
+
+    public void setTercActivityAllowed(Boolean b) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putBoolean(TERC_IS_ACTIVITY_ALLOWED, b);
+        editor.apply();
+    }
+
+    public void setTercUse(Boolean use) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putBoolean(TERC_USE, use);
+        editor.apply();
+    }
+
+    public Boolean isTercUse() {
+        return getPreferences().getBoolean(TERC_USE, defaultUseTERC);
     }
 
     public void setFailsafePassword(String password) {
@@ -49,6 +107,16 @@ public class Preferences {
 
     public String getFailsafePassword() {
         return getPreferences().getString(FAILSAFE_PASSWORD, defaultFailsafePassword);
+    }
+
+    public void setTERCACtivityURL(String url) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putString(TERC_ACTIVITY_URL, url);
+        editor.apply();
+    }
+
+    public String getTERCActivityURL() {
+        return getPreferences().getString(TERC_ACTIVITY_URL, defaultTERCActivityURL);
     }
 
     public Boolean checkFailsafePassword(String password) {
