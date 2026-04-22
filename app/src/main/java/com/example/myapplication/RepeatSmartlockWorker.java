@@ -20,6 +20,7 @@ public class RepeatSmartlockWorker extends Worker {
         Kernel kernel = new Kernel(getApplicationContext());
         kernel.smartLock("PeriodicWorker");  // doesnt do anything
         Log.v("Worker", "doWork: end");
-        return Result.retry();
+        // For a PeriodicWorkRequest this must be success()/failure(); retry() is for one-shots.
+        return Result.success();
     }
 }

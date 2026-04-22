@@ -25,7 +25,7 @@ public class RepeatSmartlockReceiver extends BroadcastReceiver {
         }
 
         Intent i = new Intent(context, RepeatSmartlockService.class);
-        i.putExtra("caller", "BoroadcastReceiver");
-        context.startService(i);
+        i.putExtra("caller", "BroadcastReceiver");
+        RepeatSmartlockService.enqueue(context, i);
     }
 }

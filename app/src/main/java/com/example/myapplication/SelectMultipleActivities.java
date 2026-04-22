@@ -2,31 +2,40 @@ package com.example.myapplication;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TableLayout;
-import android.widget.TableRow;
+import android.widget.EditText;
+import android.widget.TextView;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
 public class SelectMultipleActivities extends AppCompatActivity {
+    private static final int FILTER_DEBOUNCE_MS = 220;
+
+    private EditText editAppLaunchSearch;
     private Button okButton, cancelButton;
-    private LinearLayout appLaunchContainer;
     private Context context;
+    private PackageManager pm;
+
+    private PackagePickerAdapter adapter;
+    private final List<String> filteredItems = new ArrayList<>();
+
+    private final Handler debounceHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingFilter;
 
     private HashSet<String> selectedApps;
 
@@ -37,10 +46,40 @@ public class SelectMultipleActivities extends AppCompatActivity {
 
         selectedApps = new HashSet<>(getSelectedAppList());
         context = this;
-        appLaunchContainer = (LinearLayout) findViewById(R.id.appLaunchContainer);
+        pm = getPackageManager();
+        editAppLaunchSearch = (EditText) findViewById(R.id.editAppLaunchSearch);
         okButton = (Button) findViewById(R.id.okButton);
         cancelButton = (Button) findViewById(R.id.cancelButton);
         cancelButton.requestFocus();
+
+        RecyclerView recyclerView = findViewById(R.id.appRecyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new PackagePickerAdapter(this, pm, selectedApps);
+        recyclerView.setAdapter(adapter);
+
+        editAppLaunchSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                scheduleFilter(s != null ? s.toString() : "");
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+
+        editAppLaunchSearch.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView view, int actionId, KeyEvent keyEvent) {
+                cancelPendingFilter();
+                applyFilter(view.getText().toString());
+                return false;
+            }
+        });
 
         cancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -66,22 +105,55 @@ public class SelectMultipleActivities extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        refreshAppList();
+        applyFilter(editAppLaunchSearch.getText().toString());
         cancelButton.requestFocus();
     }
 
-    private @NonNull
-    ArrayList<String> getTotalAppList() {
-        ArrayList<String> showApps = getIntent().getStringArrayListExtra("totalApps");
-        if (showApps == null) {
-            return new ArrayList<String>();
-        } else {
-            return showApps;
+    @Override
+    protected void onDestroy() {
+        cancelPendingFilter();
+        if (adapter != null) {
+            adapter.shutdown();
+        }
+        super.onDestroy();
+    }
+
+    private void scheduleFilter(@NonNull final String query) {
+        cancelPendingFilter();
+        pendingFilter = () -> applyFilter(query);
+        debounceHandler.postDelayed(pendingFilter, FILTER_DEBOUNCE_MS);
+    }
+
+    private void cancelPendingFilter() {
+        if (pendingFilter != null) {
+            debounceHandler.removeCallbacks(pendingFilter);
+            pendingFilter = null;
         }
     }
 
+    private void applyFilter(@NonNull String search) {
+        filteredItems.clear();
+        String needle = search.trim().toLowerCase();
+        for (String app : getReorderedTotalAppList()) {
+            if (needle.isEmpty() || app.toLowerCase().contains(needle)) {
+                filteredItems.add(app);
+            }
+        }
+        adapter.setItems(filteredItems);
+    }
+
+    private @NonNull ArrayList<String> getTotalAppList() {
+        ArrayList<String> showApps = getIntent().getStringArrayListExtra("totalApps");
+        if (showApps == null) {
+            return new ArrayList<>();
+        }
+        return showApps;
+    }
+
     private @NonNull ArrayList<String> getReorderedTotalAppList() {
-        ArrayList<String> apps = getTotalAppList(), result = new ArrayList<>(), selected = getSelectedAppList();
+        ArrayList<String> apps = getTotalAppList();
+        ArrayList<String> result = new ArrayList<>();
+        ArrayList<String> selected = getSelectedAppList();
         HashSet<String> added = new HashSet<>();
         for (String app : selected) {
             if (!added.contains(app)) {
@@ -98,94 +170,11 @@ public class SelectMultipleActivities extends AppCompatActivity {
         return result;
     }
 
-    private @NonNull
-    ArrayList<String> getSelectedAppList() {
+    private @NonNull ArrayList<String> getSelectedAppList() {
         ArrayList<String> showApps = getIntent().getStringArrayListExtra("selectedApps");
         if (showApps == null) {
-            return new ArrayList<String>();
-        } else {
-            return showApps;
+            return new ArrayList<>();
         }
-    }
-
-    private void clearAppListView() {
-        int count = appLaunchContainer.getChildCount();
-        if (count > 0) {
-            for (int i = count - 1; i >= 0; i--) {
-                appLaunchContainer.removeViewAt(i);
-            }
-        }
-    }
-
-    private HashMap<String, Drawable> getAppIconMap() {
-        HashMap<String, Drawable> map = new HashMap<>();
-        final PackageManager pm = getPackageManager();
-        final List<ApplicationInfo> pkgs = Kernel.getInstalledApplicationsCompat(this);
-        for (final ApplicationInfo pkg : pkgs) {
-            map.put(pkg.packageName.toLowerCase(), pm.getApplicationIcon(pkg));
-        }
-        return map;
-    }
-
-    private Drawable getIconForPackage(HashMap<String, Drawable> appMap, String packageName) {
-        if (packageName == null) {
-            return null;
-        }
-        return appMap.get(packageName.toLowerCase());
-    }
-
-    private void refreshAppList() {
-        clearAppListView();
-
-        HashMap<String, Drawable> appMap = getAppIconMap();
-        ArrayList<String> appList = getReorderedTotalAppList();
-
-        for (final String app : appList) {
-            final CheckBox checkBox = new CheckBox(context);
-            checkBox.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.WRAP_CONTENT, TableRow.LayoutParams.WRAP_CONTENT));
-            checkBox.setText("");
-            checkBox.setChecked(selectedApps.contains(app));
-            checkBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-                @Override
-                public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                    if (b) {
-                        selectedApps.add(app);
-                    } else {
-                        selectedApps.remove(app);
-                    }
-                }
-            });
-
-            ImageView img = new ImageView(context);
-            try {
-                Drawable icon = getIconForPackage(appMap, app);
-                img.setImageDrawable(icon);
-                img.setLayoutParams(new TableRow.LayoutParams(75, 75));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            final Button btn = new Button(context);
-            btn.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.WRAP_CONTENT, TableRow.LayoutParams.WRAP_CONTENT));
-            btn.setText(app);
-            btn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    checkBox.setChecked(!checkBox.isChecked());
-                }
-            });
-
-            LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            TableLayout table = new TableLayout(context);
-            table.setLayoutParams(layoutParams);
-            TableRow tr = new TableRow(context);
-            tr.setLayoutParams(layoutParams);
-
-            tr.addView(checkBox);
-            tr.addView(img);
-            tr.addView(btn);
-            table.addView(tr);
-            appLaunchContainer.addView(table);
-        }
+        return showApps;
     }
 }

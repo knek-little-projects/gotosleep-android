@@ -2,33 +2,42 @@ package com.example.myapplication;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.util.Log;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.TableLayout;
-import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class DangerZoneActivity extends AppCompatActivity {
+    private static final int FILTER_DEBOUNCE_MS = 220;
+
     private EditText editAppLaunchSearch;
-    private LinearLayout appLaunchContainer;
-    private LinearLayout container;
     private Kernel kernel;
     private Context context;
+    private PackageManager pm;
+
+    private DangerZoneAppAdapter adapter;
+    private final List<String> filteredPackages = new ArrayList<>();
+
+    private final Handler debounceHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingFilter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,21 +45,38 @@ public class DangerZoneActivity extends AppCompatActivity {
         setContentView(R.layout.activity_danger_zone);
 
         context = this;
-        container = (LinearLayout) findViewById(R.id.dangerZoneContainer);
+        pm = getPackageManager();
         editAppLaunchSearch = (EditText) findViewById(R.id.editAppLaunchSearch);
-        appLaunchContainer = (LinearLayout) findViewById(R.id.appLaunchContainer);
         kernel = new Kernel(context);
 
-        updateContainerVisibility();
-        editAppLaunchSearch.setOnEditorActionListener(
-                new TextView.OnEditorActionListener() {
-                    @Override
-                    public boolean onEditorAction(TextView view, int i, KeyEvent keyEvent) {
-                        showApps(((TextView) view).getText().toString());
-                        return false;
-                    }
-                }
-        );
+        RecyclerView recyclerView = findViewById(R.id.dangerZoneRecyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new DangerZoneAppAdapter(this, pm);
+        recyclerView.setAdapter(adapter);
+
+        editAppLaunchSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                scheduleFilter(s != null ? s.toString() : "");
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+
+        editAppLaunchSearch.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView view, int actionId, KeyEvent keyEvent) {
+                cancelPendingFilter();
+                applyFilter(view.getText().toString());
+                return false;
+            }
+        });
 
         ((Button) findViewById(R.id.failsafePasswordButton)).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -81,70 +107,49 @@ public class DangerZoneActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateContainerVisibility();
-        showApps(editAppLaunchSearch.getText().toString());
+        applyFilter(editAppLaunchSearch.getText().toString());
     }
 
-    private void showApps(@NonNull String search) {
-        Log.d("qwe", search);
-
-        int count = appLaunchContainer.getChildCount();
-        if (count > 0) {
-            for (int i = count - 1; i >= 0; i--) {
-//                View o = appLaunchContainer.getChildAt(i);
-                appLaunchContainer.removeViewAt(i);
-            }
+    @Override
+    protected void onDestroy() {
+        cancelPendingFilter();
+        if (adapter != null) {
+            adapter.shutdown();
         }
+        super.onDestroy();
+    }
 
+    private void scheduleFilter(@NonNull final String query) {
+        cancelPendingFilter();
+        pendingFilter = () -> applyFilter(query);
+        debounceHandler.postDelayed(pendingFilter, FILTER_DEBOUNCE_MS);
+    }
+
+    private void cancelPendingFilter() {
+        if (pendingFilter != null) {
+            debounceHandler.removeCallbacks(pendingFilter);
+            pendingFilter = null;
+        }
+    }
+
+    private void applyFilter(@NonNull String search) {
+        filteredPackages.clear();
         StaticProcessList staticProcessList = StaticProcessList.fromPreferences(kernel, kernel.getPreferences());
+        String needle = search.trim().toLowerCase();
 
-        final PackageManager pm = getPackageManager();
-        final List<ApplicationInfo> pkgs = pm.getInstalledApplications(0);
-        for (final ApplicationInfo pkg : pkgs) {
-            if (!pkg.packageName.toLowerCase().contains(search.toLowerCase())) {
+        for (ApplicationInfo pkg : Kernel.getInstalledApplicationsCompat(this)) {
+            if (!needle.isEmpty() && !pkg.packageName.toLowerCase().contains(needle)) {
                 continue;
             }
-
             if (!staticProcessList.isPackageAllowed(pkg.packageName)) {
                 continue;
             }
-
-            final Intent intent = pm.getLaunchIntentForPackage(pkg.packageName);
-            if (intent == null) {
+            if (pm.getLaunchIntentForPackage(pkg.packageName) == null) {
                 continue;
             }
-
-            Log.d("qwe", "Adding " + pkg.packageName);
-//            final LinearLayout.LayoutParams buttonlayout = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-
-            ImageView img = new ImageView(context);
-            try {
-                Drawable icon = pm.getApplicationIcon(pkg);
-                img.setImageDrawable(icon);
-                img.setLayoutParams(new TableRow.LayoutParams(75, 75));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            final Button btn = new Button(context);
-            btn.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.WRAP_CONTENT, TableRow.LayoutParams.WRAP_CONTENT));
-            btn.setText(pkg.packageName);
-            btn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    context.startActivity(intent);
-                }
-            });
-
-            LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            TableLayout table = new TableLayout(context);
-            table.setLayoutParams(layoutParams);
-            TableRow tr = new TableRow(context);
-            tr.setLayoutParams(layoutParams);
-
-            tr.addView(img);
-            tr.addView(btn);
-            table.addView(tr);
-            appLaunchContainer.addView(table);
+            filteredPackages.add(pkg.packageName);
         }
+
+        adapter.setItems(filteredPackages);
     }
 }

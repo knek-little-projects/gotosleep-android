@@ -410,6 +410,9 @@ public class Kernel {
 
     public void bringToFront() {
         Intent intent = new Intent(context.getApplicationContext(), MainActivity.class);
+        // startActivity() from a non-Activity (ApplicationContext) context requires NEW_TASK,
+        // otherwise Android throws AndroidRuntimeException.
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.getApplicationContext().startActivity(intent);
     }
 

@@ -8,6 +8,7 @@ import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 
 import android.app.ActivityManager;
+import android.app.AppOpsManager;
 import android.app.admin.DevicePolicyManager;
 import android.app.usage.UsageStats;
 import android.app.usage.UsageStatsManager;
@@ -53,6 +54,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class ControlActivity extends AppCompatActivity {
@@ -140,24 +143,9 @@ public class ControlActivity extends AppCompatActivity {
             RepeatSmartlockAlarm.setAlarm(this);
         }
 
-        if (!isPeriodicWorkerRunning()) {
-            Log.w("Smartlock", "Periodic worker is not running: starting");
-            startPeriodicWorker();
-        }
-    }
-
-    private boolean isPeriodicWorkerRunning() {
-        try {
-            List<WorkInfo> infos = WorkManager.getInstance().getWorkInfosForUniqueWork(RepeatSmartlockWorker.class.getName()).get();
-            for (WorkInfo info : infos) {
-                if (info.getState() == WorkInfo.State.ENQUEUED || info.getState() == WorkInfo.State.RUNNING) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return false;
+        // ExistingPeriodicWorkPolicy.KEEP makes this idempotent - no need to query state first.
+        // The previous .get() on the UI thread was an ANR source (same bug as the check-status button).
+        startPeriodicWorker();
     }
 
     private void startPeriodicWorker() {
@@ -165,7 +153,7 @@ public class ControlActivity extends AppCompatActivity {
                 RepeatSmartlockWorker.class, 15, TimeUnit.MINUTES
         ).build();
 
-        WorkManager.getInstance().enqueueUniquePeriodicWork(
+        WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork(
                 RepeatSmartlockWorker.class.getName(), ExistingPeriodicWorkPolicy.KEEP, workRequest);
 
     }
@@ -236,6 +224,30 @@ public class ControlActivity extends AppCompatActivity {
                     ((intent.getFlags() & Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
                             != Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);
             kernel.runAnotherHomeLauncher();
+        }
+    }
+
+    private boolean hasUsageStatsPermission() {
+        try {
+            AppOpsManager appOps = (AppOpsManager) getSystemService(Context.APP_OPS_SERVICE);
+            if (appOps == null) {
+                return false;
+            }
+            int mode;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                mode = appOps.unsafeCheckOpNoThrow(
+                        AppOpsManager.OPSTR_GET_USAGE_STATS,
+                        android.os.Process.myUid(),
+                        getPackageName());
+            } else {
+                mode = appOps.checkOpNoThrow(
+                        AppOpsManager.OPSTR_GET_USAGE_STATS,
+                        android.os.Process.myUid(),
+                        getPackageName());
+            }
+            return mode == AppOpsManager.MODE_ALLOWED;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -591,10 +603,34 @@ public class ControlActivity extends AppCompatActivity {
             public void onClick(View view) {
                 TextView textView = (TextView) findViewById(R.id.processListView);
 
+                if (!hasUsageStatsPermission()) {
+                    textView.setText("No usage access permission. Tap to grant it in Settings.");
+                    Toast.makeText(ControlActivity.this,
+                            "Grant Usage access to see running processes",
+                            Toast.LENGTH_LONG).show();
+                    try {
+                        startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+                    } catch (Exception e) {
+                        Log.w("showRunningProcesses", "cannot open usage access settings", e);
+                    }
+                    return;
+                }
+
                 UsageStatsManager mUsageStatsManager = (UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
+                if (mUsageStatsManager == null) {
+                    textView.setText("UsageStatsManager is not available on this device");
+                    return;
+                }
+
                 long time = System.currentTimeMillis();
-                long seconds = 120;
-                List<UsageStats> stats = mUsageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 1000 * seconds, time);
+                long windowMs = TimeUnit.HOURS.toMillis(24);
+                List<UsageStats> stats = mUsageStatsManager.queryUsageStats(
+                        UsageStatsManager.INTERVAL_DAILY, time - windowMs, time);
+
+                if (stats == null || stats.isEmpty()) {
+                    textView.setText("No usage data in the last 24h");
+                    return;
+                }
 
                 stats.sort(new Comparator<UsageStats>() {
                     @Override
@@ -603,10 +639,14 @@ public class ControlActivity extends AppCompatActivity {
                     }
                 });
 
-                // Sort the stats by the last time used
                 StringBuilder sb = new StringBuilder();
+                sb.append(stats.size()).append(" packages (last 24h):\n\n");
                 for (UsageStats usageStats : stats) {
-                    sb.append(usageStats.getPackageName()).append("\n");
+                    long ageSec = Math.max(0, (time - usageStats.getLastTimeUsed()) / 1000);
+                    sb.append(usageStats.getPackageName())
+                            .append("  (")
+                            .append(ageSec)
+                            .append("s ago)\n");
                 }
                 textView.setText(sb.toString());
             }
@@ -617,7 +657,7 @@ public class ControlActivity extends AppCompatActivity {
             public void onClick(View view) {
                 Intent i = new Intent(context, RepeatSmartlockService.class);
                 i.putExtra("LockNow", true);
-                startService(i);
+                RepeatSmartlockService.enqueue(context, i);
             }
         });
 
@@ -632,7 +672,7 @@ public class ControlActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.stopCronjobButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                WorkManager.getInstance().cancelUniqueWork(RepeatSmartlockWorker.class.getName());
+                WorkManager.getInstance(getApplicationContext()).cancelUniqueWork(RepeatSmartlockWorker.class.getName());
                 Toast.makeText(view.getContext(), "Stopped daemon", Toast.LENGTH_SHORT).show();
             }
         });
@@ -656,52 +696,91 @@ public class ControlActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.checkStatusButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                TextView textView = (TextView) findViewById(R.id.checkStatusLabel);
-                StringBuilder sb = new StringBuilder();
+                final TextView textView = (TextView) findViewById(R.id.checkStatusLabel);
+                textView.setText("…");
 
-                sb.append("Allow usage stats: ???\n");
+                final Context appCtx = getApplicationContext();
+                final ExecutorService ex = Executors.newSingleThreadExecutor();
+                ex.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            String daemonLine;
+                            try {
+                                List<WorkInfo> infos = WorkManager.getInstance(appCtx)
+                                        .getWorkInfosForUniqueWork(RepeatSmartlockWorker.class.getName())
+                                        .get();
+                                StringBuilder w = new StringBuilder();
+                                for (WorkInfo info : infos) {
+                                    if (w.length() > 0) {
+                                        w.append(", ");
+                                    }
+                                    w.append(info.getState().toString());
+                                }
+                                daemonLine = w.length() > 0 ? w.toString() : "(none)";
+                            } catch (Exception e) {
+                                daemonLine = "error: " + e.getMessage();
+                                Log.w("checkStatus", "WorkManager query failed", e);
+                            }
 
-                sb.append("Home Launcher: ");
-                String hl = preferences.getHomeLauncher();
-                if (hl != null) {
-                    sb.append(hl);
-                }
-                sb.append("\n");
+                            final String line = daemonLine;
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        StringBuilder sb = new StringBuilder();
+                                        sb.append("Allow usage stats: ");
+                                        sb.append(hasUsageStatsPermission() ? "yes" : "no").append("\n");
 
-                sb.append("isMyAppLauncherDefault: ");
-                sb.append(isMyAppLauncherDefault()).append("\n");
+                                        sb.append("Home Launcher: ");
+                                        String hl = preferences.getHomeLauncher();
+                                        if (hl != null) {
+                                            sb.append(hl);
+                                        }
+                                        sb.append("\n");
 
-                sb.append("Admin: ");
-                if (DeviceAdmin.isEnabled(context)) {
-                    sb.append("ENABLED");
-                }
-                sb.append("\n");
+                                        sb.append("isMyAppLauncherDefault: ");
+                                        sb.append(isMyAppLauncherDefault()).append("\n");
 
-                sb.append("Periodic daemon: ");
-                try {
-                    List<WorkInfo> infos = WorkManager.getInstance().getWorkInfosForUniqueWork(RepeatSmartlockWorker.class.getName()).get();
-                    for (WorkInfo info : infos) {
-                        sb.append(info.getState().toString());
+                                        sb.append("Admin: ");
+                                        if (DeviceAdmin.isEnabled(context)) {
+                                            sb.append("ENABLED");
+                                        } else {
+                                            sb.append("no");
+                                        }
+                                        sb.append("\n");
+
+                                        sb.append("Periodic daemon: ");
+                                        sb.append(line).append("\n");
+
+                                        sb.append("Some alarm: ");
+                                        if (RepeatSmartlockAlarm.isSomeAlarmSet(context)) {
+                                            sb.append("SET");
+                                        } else {
+                                            sb.append("no");
+                                        }
+                                        sb.append("\n");
+
+                                        sb.append("Timer: ");
+                                        if (timer != null) {
+                                            sb.append("RUNNING");
+                                        } else {
+                                            sb.append("stopped");
+                                        }
+                                        sb.append("\n");
+
+                                        textView.setText(sb.toString());
+                                    } catch (Exception e) {
+                                        Toast.makeText(ControlActivity.this, e.getMessage(), Toast.LENGTH_LONG).show();
+                                        Log.e("checkStatus", "building status", e);
+                                    }
+                                }
+                            });
+                        } finally {
+                            ex.shutdown();
+                        }
                     }
-                } catch (Exception e) {
-                    sb.append(e.toString());
-                    e.printStackTrace();
-                }
-                sb.append("\n");
-
-                sb.append("Some alarm: ");
-                if (RepeatSmartlockAlarm.isSomeAlarmSet(context)) {
-                    sb.append("SET");
-                }
-                sb.append("\n");
-
-                sb.append("Timer: ");
-                if (timer != null) {
-                    sb.append("RUNNING");
-                }
-                sb.append("\n");
-
-                textView.setText(sb.toString());
+                });
             }
         });
 

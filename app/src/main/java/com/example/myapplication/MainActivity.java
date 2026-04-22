@@ -112,24 +112,9 @@ public class MainActivity extends AppCompatActivity {
             RepeatSmartlockAlarm.setAlarm(this);
         }
 
-        if (!isPeriodicWorkerRunning()) {
-            Log.w("Smartlock", "Periodic worker is not running: starting");
-            startPeriodicWorker();
-        }
-    }
-
-    private boolean isPeriodicWorkerRunning() {
-        try {
-            List<WorkInfo> infos = WorkManager.getInstance().getWorkInfosForUniqueWork(RepeatSmartlockWorker.class.getName()).get();
-            for (WorkInfo info : infos) {
-                if (info.getState() == WorkInfo.State.ENQUEUED || info.getState() == WorkInfo.State.RUNNING) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return false;
+        // Idempotent - KEEP means "do nothing if it already exists". Avoids blocking the UI thread
+        // on WorkManager.getWorkInfos(...).get() which was the source of ANRs.
+        startPeriodicWorker();
     }
 
     private void startPeriodicWorker() {
@@ -137,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
                 RepeatSmartlockWorker.class, 15, TimeUnit.MINUTES
         ).build();
 
-        WorkManager.getInstance().enqueueUniquePeriodicWork(
+        WorkManager.getInstance(getApplicationContext()).enqueueUniquePeriodicWork(
                 RepeatSmartlockWorker.class.getName(), ExistingPeriodicWorkPolicy.KEEP, workRequest);
 
     }
