@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -315,10 +316,31 @@ public class Kernel {
         return false;
     }
 
+    private static int installedApplicationsQueryFlags() {
+        int flags = PackageManager.GET_META_DATA;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            flags |= PackageManager.MATCH_DISABLED_COMPONENTS
+                    | PackageManager.MATCH_DISABLED_UNTIL_USED_COMPONENTS;
+        }
+        return flags;
+    }
+
+    /**
+     * Same package visibility as {@link #getPackageNameList()} (QUERY_ALL_PACKAGES + flags).
+     */
+    @NonNull
+    static List<ApplicationInfo> getInstalledApplicationsCompat(@NonNull Context context) {
+        PackageManager pm = context.getPackageManager();
+        int flags = installedApplicationsQueryFlags();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(flags));
+        }
+        return pm.getInstalledApplications(flags);
+    }
+
     public ArrayList<String> getPackageNameList() {
-        final PackageManager pm = context.getPackageManager();
         final ArrayList<String> apps = new ArrayList<>();
-        for (ApplicationInfo applicationInfo : pm.getInstalledApplications(0)) {
+        for (ApplicationInfo applicationInfo : getInstalledApplicationsCompat(context)) {
             apps.add(applicationInfo.packageName);
         }
         return apps;
