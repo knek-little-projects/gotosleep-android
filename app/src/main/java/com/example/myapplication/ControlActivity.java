@@ -337,7 +337,7 @@ public class ControlActivity extends AppCompatActivity {
         final DevicePolicyManager devicePolicyManager = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
         final ComponentName componentName = new ComponentName(this, DeviceAdmin.class);
 
-        CheckBox smartLockCheck = (CheckBox) findViewById(R.id.smartLockCheck);
+        final CheckBox smartLockCheck = (CheckBox) findViewById(R.id.smartLockCheck);
         smartLockCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
@@ -345,6 +345,43 @@ public class ControlActivity extends AppCompatActivity {
                 if (b) {
                     ensureAllRunning();
                 }
+            }
+        });
+
+        ((Button) findViewById(R.id.forceCriticalButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // Debug helper: simulate critical-zone for exactly 2 minutes regardless of the
+                // configured safe/danger/critical times. Kernel.getPeriod() reads the deadline
+                // from prefs, so all three enforcement mechanisms (Timer/Worker/Alarm) will
+                // treat "now" as critical until the deadline passes. At that point Kernel's
+                // lazy check does the teardown; we ALSO schedule a UI-side teardown below so
+                // the user sees the checkbox flip back to off while this screen is open.
+                final long durationMs = 2 * 60 * 1000L;
+                final long expireAt = System.currentTimeMillis() + durationMs;
+
+                preferences.setForceCriticalUntilMillis(expireAt);
+                preferences.setSmartLockEnabled(true);
+                smartLockCheck.setChecked(true);
+                ensureAllRunning();
+                Toast.makeText(context, "Critical zone forced for 2 minutes", Toast.LENGTH_SHORT).show();
+
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        // Belt: clear the override / smartlock here so UI reflects the state
+                        // immediately. Suspenders: Kernel.getPeriod() would also clear these
+                        // lazily, so the state stays consistent even if this Activity was
+                        // destroyed before the deadline.
+                        preferences.setForceCriticalUntilMillis(0L);
+                        preferences.setSmartLockEnabled(false);
+                        preferences.setShouldTimerBeRunning(false);
+                        if (!isFinishing() && !isDestroyed()) {
+                            smartLockCheck.setChecked(false);
+                            Toast.makeText(context, "Force critical expired", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }, durationMs);
             }
         });
 
@@ -471,6 +508,52 @@ public class ControlActivity extends AppCompatActivity {
                 Intent intent = new Intent();
                 intent.setAction(Settings.ACTION_USAGE_ACCESS_SETTINGS);
                 context.startActivity(intent);
+            }
+        });
+
+        ((Button) findViewById(R.id.overlayPermissionButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // ACTION_MANAGE_OVERLAY_PERMISSION is the only way to grant SYSTEM_ALERT_WINDOW
+                // on M+; there is no runtime-permission dialog for it. On pre-M the permission
+                // is granted at install time and this toggle is a no-op.
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
+                    Toast.makeText(context, "Already granted on this Android version", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                try {
+                    Intent intent = new Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:" + context.getPackageName()));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    // Some OEM ROMs don't honour the per-package URI. Fall back to the global
+                    // overlay settings screen which always resolves.
+                    try {
+                        Intent fallback = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+                        fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        context.startActivity(fallback);
+                    } catch (Exception e2) {
+                        Toast.makeText(context, "Cannot open overlay settings: " + e2, Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+        });
+
+        ((Button) findViewById(R.id.accessibilityServiceButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                    Toast.makeText(context,
+                            "Find \"" + getString(R.string.app_name) + "\" in the list and enable it",
+                            Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
+                    Toast.makeText(context, "Cannot open accessibility settings: " + e, Toast.LENGTH_LONG).show();
+                }
             }
         });
 
@@ -731,6 +814,22 @@ public class ControlActivity extends AppCompatActivity {
                                         StringBuilder sb = new StringBuilder();
                                         sb.append("Allow usage stats: ");
                                         sb.append(hasUsageStatsPermission() ? "yes" : "no").append("\n");
+
+                                        // Reflects two things that together decide whether
+                                        // bringToFront() can actually work from a background
+                                        // context (Timer / Worker / AlarmReceiver).
+                                        sb.append("Overlay (SYSTEM_ALERT_WINDOW): ");
+                                        sb.append(kernel.canDrawOverlays() ? "yes" : "no").append("\n");
+
+                                        sb.append("Accessibility minimize service: ");
+                                        if (MinimizeAccessibilityService.isRunning()) {
+                                            sb.append("RUNNING");
+                                        } else if (MinimizeAccessibilityService.isEnabledInSettings(context)) {
+                                            sb.append("enabled in settings, not yet bound");
+                                        } else {
+                                            sb.append("no");
+                                        }
+                                        sb.append("\n");
 
                                         sb.append("Home Launcher: ");
                                         String hl = preferences.getHomeLauncher();

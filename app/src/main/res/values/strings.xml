@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Smartlock</string>
+    <string name="minimize_accessibility_service_description">Allows Smartlock to send the device to the Home screen when a forbidden app is detected during critical time. No user interaction is observed or recorded.</string>
 </resources>

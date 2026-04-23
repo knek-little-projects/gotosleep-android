@@ -7,6 +7,9 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -175,6 +178,31 @@ public class Kernel {
             return DEBUG_PERIOD;
         }
 
+        // Debug/test override: the "Force critical for 2 min" button in ControlActivity sets
+        // a deadline in prefs. While it's active we short-circuit straight to CRITICAL_PERIOD;
+        // once it expires we tear everything down (disable smartlock, stop timer) so the app
+        // doesn't stay "locked" forever if the UI process died.
+        long forceCritUntil = preferences.getForceCriticalUntilMillis();
+        if (forceCritUntil > 0) {
+            long nowMillis = System.currentTimeMillis();
+            if (nowMillis < forceCritUntil) {
+                if (!preferences.isSmartLockEnabled()) {
+                    // User disabled smartlock manually during the 2-min window - honour that
+                    // and clear the override so we don't re-enable it implicitly.
+                    preferences.setForceCriticalUntilMillis(0L);
+                    return SAFE_PERIOD;
+                }
+                return CRITICAL_PERIOD;
+            }
+            // Expired: perform the documented teardown exactly once.
+            Log.i("kernel", "Force critical window expired - disabling smartlock");
+            log("Force critical expired - smartlock disabled");
+            preferences.setForceCriticalUntilMillis(0L);
+            preferences.setSmartLockEnabled(false);
+            preferences.setShouldTimerBeRunning(false);
+            return SAFE_PERIOD;
+        }
+
         String now = getNow();
 
         if (!preferences.isSmartLockEnabled()) {
@@ -287,33 +315,56 @@ public class Kernel {
         return sdf.format(currentTime);
     }
 
-    public boolean isForbiddenAppRunning() {
+    /**
+     * Returns the package name of the app most recently brought to the foreground, or null if
+     * UsageStats is unavailable / permission is not granted. Extracted so that we can reuse it
+     * both for forbidden-app detection and for the bringToFront() fallback verification.
+     */
+    public String getTopPackage() {
         UsageStatsManager mUsageStatsManager = (UsageStatsManager) context.getSystemService(Context.USAGE_STATS_SERVICE);
+        if (mUsageStatsManager == null) {
+            return null;
+        }
         long time = System.currentTimeMillis();
         long millisec = 60000;
         List<UsageStats> stats = mUsageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - millisec, time);
-
+        if (stats == null || stats.isEmpty()) {
+            return null;
+        }
         stats.sort(new Comparator<UsageStats>() {
             @Override
             public int compare(UsageStats a, UsageStats b) {
                 return -Long.compare(a.getLastTimeUsed(), b.getLastTimeUsed());
             }
         });
+        return stats.get(0).getPackageName();
+    }
 
-        if (stats.isEmpty()) {
+    public boolean isForbiddenAppRunning() {
+        return getForbiddenTopPackage() != null;
+    }
+
+    /**
+     * Returns the package name currently on top IF and ONLY IF it is considered forbidden in the
+     * current period (via {@link StaticProcessList}). Otherwise returns null. Our own package is
+     * always treated as allowed to avoid feedback loops.
+     */
+    public String getForbiddenTopPackage() {
+        String pkgName = getTopPackage();
+        if (pkgName == null) {
             Log.d("Timer", "Empty usage stats");
-        } else {
-            String pkgName = stats.get(0).getPackageName();
-            if (pkgName != null && !pkgName.equals(context.getPackageName()) && !StaticProcessList.fromPreferences(this, preferences).isPackageAllowed(pkgName)) {
-                Log.w("Timer", "Last is " + pkgName);
-                Log.w("Timer", "BRINGING TO FRONT");
-                return true;
-            } else {
-                Log.d("Timer", "Last is " + pkgName);
-            }
+            return null;
         }
-
-        return false;
+        if (pkgName.equals(context.getPackageName())) {
+            Log.d("Timer", "Last is our own package");
+            return null;
+        }
+        if (StaticProcessList.fromPreferences(this, preferences).isPackageAllowed(pkgName)) {
+            Log.d("Timer", "Last is allowed " + pkgName);
+            return null;
+        }
+        Log.w("Timer", "Last is forbidden " + pkgName);
+        return pkgName;
     }
 
     private static int installedApplicationsQueryFlags() {
@@ -393,8 +444,11 @@ public class Kernel {
             Log.d("kernel", "Smartlock: same period: " + Integer.toString(lastPeriod));
         }
 
-        if (newPeriod != SAFE_PERIOD && isForbiddenAppRunning()) {
-            bringToFront();
+        if (newPeriod != SAFE_PERIOD) {
+            String offending = getForbiddenTopPackage();
+            if (offending != null) {
+                bringToFront(offending);
+            }
         }
 
         if (doLock) {
@@ -408,12 +462,98 @@ public class Kernel {
         }
     }
 
+    /** Convenience overload preserved for callers that don't track the offending package. */
     public void bringToFront() {
-        Intent intent = new Intent(context.getApplicationContext(), MainActivity.class);
-        // startActivity() from a non-Activity (ApplicationContext) context requires NEW_TASK,
-        // otherwise Android throws AndroidRuntimeException.
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.getApplicationContext().startActivity(intent);
+        String offending = getForbiddenTopPackage();
+        bringToFront(offending);
+    }
+
+    /**
+     * Three-layer strategy for ejecting the user out of a forbidden foreground app:
+     *
+     *   (1) AccessibilityService performGlobalAction(HOME) - works from any thread/context,
+     *       exempt from Android 10+ BAL restrictions, requires the user to enable our
+     *       MinimizeAccessibilityService. This is the path we want to hit in practice.
+     *
+     *   (2) startActivity(MainActivity) - only succeeds from background if the app has
+     *       SYSTEM_ALERT_WINDOW ("Display over other apps") granted. Otherwise the OS
+     *       silently blocks the launch and logs "Background activity launch blocked".
+     *
+     *   (3) Fallback: 1500ms later, re-check UsageStats. If the same forbidden package is
+     *       still on top, both (1) and (2) failed - so we lock the device via DeviceAdmin.
+     *       Comparing against the *specific* previously-offending package (not just
+     *       "any forbidden app") avoids false-positive locks when (1) correctly sent the
+     *       user to the home launcher and the home launcher itself isn't whitelisted.
+     *
+     * @param offendingPackage the package seen on top before this call, or null if unknown.
+     *                         When null we skip the fallback check, since we wouldn't know
+     *                         what "success" looks like.
+     */
+    public void bringToFront(final String offendingPackage) {
+        boolean a11yFired = MinimizeAccessibilityService.goHome();
+        if (a11yFired) {
+            Log.d("kernel", "bringToFront: GLOBAL_ACTION_HOME dispatched via accessibility");
+        } else {
+            Log.d("kernel", "bringToFront: a11y service not available, trying startActivity");
+            try {
+                Intent intent = new Intent(context.getApplicationContext(), MainActivity.class);
+                // startActivity() from a non-Activity (ApplicationContext) context requires NEW_TASK,
+                // otherwise Android throws AndroidRuntimeException. Note: from API 29+ this call is
+                // also subject to BAL and may silently fail unless SYSTEM_ALERT_WINDOW is granted.
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.getApplicationContext().startActivity(intent);
+                Log.d("kernel", "bringToFront: startActivity(MainActivity) fired");
+            } catch (Throwable t) {
+                Log.w("kernel", "bringToFront: startActivity threw", t);
+            }
+        }
+
+        if (offendingPackage == null) {
+            return;
+        }
+
+        scheduleEnforceFallback(offendingPackage);
+    }
+
+    /**
+     * Post a delayed check on the main looper: if the forbidden app is STILL on top after the
+     * grace period, it means neither accessibility nor startActivity succeeded - escalate to
+     * a device lock via DeviceAdmin, which always works (no BAL restriction applies to lockNow).
+     */
+    private void scheduleEnforceFallback(final String expectedOffendingPackage) {
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                String nowTop = getTopPackage();
+                if (nowTop == null) {
+                    Log.d("kernel", "bringToFront fallback: no usage stats, skipping");
+                    return;
+                }
+                if (!expectedOffendingPackage.equals(nowTop)) {
+                    Log.d("kernel", "bringToFront fallback OK: top changed " + expectedOffendingPackage + " -> " + nowTop);
+                    return;
+                }
+                Log.w("kernel", "bringToFront fallback: " + nowTop + " still on top - LOCKING");
+                log("bringToFront fallback: locking (" + nowTop + " would not minimize)");
+                if (DeviceAdmin.isEnabled(context)) {
+                    DeviceAdmin.lockNow(context);
+                } else {
+                    Log.e("kernel", "bringToFront fallback: admin disabled, cannot lock");
+                }
+            }
+        }, 1500);
+    }
+
+    /**
+     * Whether the OS has granted this app the overlay permission, which is what lets our
+     * background startActivity() calls bypass BAL restrictions on Android 10+. Prior to M this
+     * permission is granted at install time and always true.
+     */
+    public boolean canDrawOverlays() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return true;
+        }
+        return Settings.canDrawOverlays(context);
     }
 
 

@@ -31,6 +31,12 @@
                 android:layout_height="wrap_content"
                 android:text="ENABLE SMART LOCK" />
 
+            <Button
+                android:id="@+id/forceCriticalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Force critical zone for 2 min" />
+
             <CheckBox
                 android:id="@+id/tercCheck"
                 android:layout_width="wrap_content"
@@ -144,6 +150,18 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Check usage stats access" />
+
+            <Button
+                android:id="@+id/overlayPermissionButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Grant overlay permission (bypass BAL)" />
+
+            <Button
+                android:id="@+id/accessibilityServiceButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Enable accessibility service (minimize)" />
 
             <LinearLayout
                 android:layout_width="match_parent"

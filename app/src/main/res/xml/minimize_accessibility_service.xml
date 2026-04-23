@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Minimal accessibility service config: we do NOT want to observe any events, but the OS
+    still requires the service to declare what it *could* listen to. We keep flags/events
+    intentionally tight so the service has no reason to do work and the battery/privacy
+    impact is effectively zero. The only reason this service exists is performGlobalAction().
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canPerformGestures="false"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/minimize_accessibility_service_description"
+    android:notificationTimeout="100"
+    android:settingsActivity="com.example.myapplication.ControlActivity" />

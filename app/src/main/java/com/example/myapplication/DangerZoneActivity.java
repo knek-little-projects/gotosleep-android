@@ -23,6 +23,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class DangerZoneActivity extends AppCompatActivity {
@@ -51,7 +53,10 @@ public class DangerZoneActivity extends AppCompatActivity {
 
         RecyclerView recyclerView = findViewById(R.id.dangerZoneRecyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new DangerZoneAppAdapter(this, pm);
+        adapter = new DangerZoneAppAdapter(this, pm, pkg -> {
+            kernel.getPreferences().recordDangerZoneLaunch(pkg);
+            applyFilter(editAppLaunchSearch.getText().toString());
+        });
         recyclerView.setAdapter(adapter);
 
         editAppLaunchSearch.addTextChangedListener(new TextWatcher() {
@@ -149,6 +154,20 @@ public class DangerZoneActivity extends AppCompatActivity {
             }
             filteredPackages.add(pkg.packageName);
         }
+
+        Preferences prefs = kernel.getPreferences();
+        Collections.sort(filteredPackages, new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                int byTime = Long.compare(
+                        prefs.getDangerZoneLastLaunchMillis(b),
+                        prefs.getDangerZoneLastLaunchMillis(a));
+                if (byTime != 0) {
+                    return byTime;
+                }
+                return a.compareTo(b);
+            }
+        });
 
         adapter.setItems(filteredPackages);
     }

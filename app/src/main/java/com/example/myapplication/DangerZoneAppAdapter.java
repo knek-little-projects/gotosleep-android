@@ -13,6 +13,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
@@ -27,18 +28,28 @@ import java.util.concurrent.Executors;
  */
 public class DangerZoneAppAdapter extends RecyclerView.Adapter<DangerZoneAppAdapter.Holder> {
 
+    public interface OnDangerZoneLaunchListener {
+        void onDangerZoneLaunch(@NonNull String packageName);
+    }
+
     private final Activity activity;
     private final LayoutInflater inflater;
     private final PackageManager pm;
+    @Nullable
+    private final OnDangerZoneLaunchListener launchListener;
     private final List<String> items = new ArrayList<>();
     private final Map<String, Drawable> iconCache = new HashMap<>();
     private final ExecutorService iconExecutor = Executors.newFixedThreadPool(2);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    DangerZoneAppAdapter(Activity activity, PackageManager pm) {
+    DangerZoneAppAdapter(
+            Activity activity,
+            PackageManager pm,
+            @Nullable OnDangerZoneLaunchListener launchListener) {
         this.activity = activity;
         this.inflater = LayoutInflater.from(activity);
         this.pm = pm;
+        this.launchListener = launchListener;
     }
 
     void shutdown() {
@@ -65,12 +76,9 @@ public class DangerZoneAppAdapter extends RecyclerView.Adapter<DangerZoneAppAdap
         h.icon.setImageDrawable(null);
 
         h.button.setText(pkg);
-        h.button.setOnClickListener(v -> {
-            Intent intent = pm.getLaunchIntentForPackage(pkg);
-            if (intent != null) {
-                activity.startActivity(intent);
-            }
-        });
+        View.OnClickListener launchClick = v -> launchFromRow(pkg);
+        h.button.setOnClickListener(launchClick);
+        h.icon.setOnClickListener(launchClick);
 
         Drawable master = iconCache.get(pkg);
         if (master != null) {
@@ -92,6 +100,16 @@ public class DangerZoneAppAdapter extends RecyclerView.Adapter<DangerZoneAppAdap
             } catch (PackageManager.NameNotFoundException ignored) {
             }
         });
+    }
+
+    private void launchFromRow(@NonNull String pkg) {
+        Intent intent = pm.getLaunchIntentForPackage(pkg);
+        if (intent != null) {
+            if (launchListener != null) {
+                launchListener.onDangerZoneLaunch(pkg);
+            }
+            activity.startActivity(intent);
+        }
     }
 
     private static Drawable cloneDrawable(Drawable source) {

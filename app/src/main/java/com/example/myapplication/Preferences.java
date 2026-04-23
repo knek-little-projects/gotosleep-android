@@ -50,6 +50,15 @@ public class Preferences {
     static private final String PASSWORD_DISABLE_PERIOD_ENABLED = "PASSWORD_DISABLE_PERIOD_ENABLED";
     static private final String PASSWORD_DISABLE_PERIOD_START = "PASSWORD_DISABLE_PERIOD_START";
     static private final String PASSWORD_DISABLE_PERIOD_END = "PASSWORD_DISABLE_PERIOD_END";
+    /** Per-package last launch time from Danger Zone list (epoch millis). Key = prefix + packageName. */
+    static private final String DANGER_ZONE_LAST_LAUNCH_PREFIX = "DZ_LAST_";
+    /**
+     * Epoch-millis deadline while we are simulating critical zone on user demand (the
+     * "Force critical for 2 min" debug button in ControlActivity). 0 means no override.
+     * When {@code now >= forceCriticalUntilMillis} the override is considered expired and
+     * must be torn down (smartlock disabled, timer stopped).
+     */
+    static private final String FORCE_CRITICAL_UNTIL = "FORCE_CRITICAL_UNTIL";
 
     private Context context;
 
@@ -83,6 +92,16 @@ public class Preferences {
         return getPreferences().getString(PASSWORD_DISABLE_PERIOD_END, "00:00");
     }
 
+    public long getForceCriticalUntilMillis() {
+        return getPreferences().getLong(FORCE_CRITICAL_UNTIL, 0L);
+    }
+
+    public void setForceCriticalUntilMillis(long epochMillis) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putLong(FORCE_CRITICAL_UNTIL, epochMillis);
+        editor.apply();
+    }
+
     public long getLastTERCRequestTime() {
         return getPreferences().getLong(LAST_TERC_REQUEST_TIME, 0);
     }
@@ -91,6 +110,16 @@ public class Preferences {
         SharedPreferences.Editor editor = getPreferences().edit();
         editor.putLong(LAST_TERC_REQUEST_TIME, val);
         editor.apply();
+    }
+
+    public void recordDangerZoneLaunch(@NonNull String packageName) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putLong(DANGER_ZONE_LAST_LAUNCH_PREFIX + packageName, System.currentTimeMillis());
+        editor.apply();
+    }
+
+    public long getDangerZoneLastLaunchMillis(@NonNull String packageName) {
+        return getPreferences().getLong(DANGER_ZONE_LAST_LAUNCH_PREFIX + packageName, 0L);
     }
 
     public int getCurPeriod() {
