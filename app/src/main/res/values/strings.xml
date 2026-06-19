@@ -1,4 +1,16 @@
 <resources>
     <string name="app_name">Smartlock</string>
     <string name="minimize_accessibility_service_description">Allows Smartlock to send the device to the Home screen when a forbidden app is detected during critical time. No user interaction is observed or recorded.</string>
+    <string name="block_notification_channel_name">Blocked apps</string>
+    <string name="block_notification_channel_description">Shows when Smartlock ejects a forbidden app or locks the device because ejection failed.</string>
+    <string name="block_notification_title">App blocked</string>
+    <string name="block_notification_text">Blocked %1$s (%2$s) — %3$s</string>
+    <string name="fallback_lock_notification_title">Screen locked</string>
+    <string name="fallback_lock_notification_text">Could not close %1$s (%2$s) — locked the device (%3$s)</string>
+    <string name="test_notification_title">Test Alarm</string>
+    <string name="test_notification_text">Hello World</string>
+    <string name="test_notification_sent">Test notification sent</string>
+    <string name="block_notification_period_danger">danger zone (blacklist)</string>
+    <string name="block_notification_period_critical">critical zone (whitelist)</string>
+    <string name="block_notification_period_other">restricted time</string>
 </resources>

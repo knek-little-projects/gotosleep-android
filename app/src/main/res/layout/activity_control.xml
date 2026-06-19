@@ -37,6 +37,12 @@
                 android:layout_height="wrap_content"
                 android:text="Force critical zone for 2 min" />
 
+            <Button
+                android:id="@+id/testAlarmButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Тестовый Аларм" />
+
             <CheckBox
                 android:id="@+id/tercCheck"
                 android:layout_width="wrap_content"

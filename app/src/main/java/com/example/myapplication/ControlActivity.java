@@ -385,6 +385,14 @@ public class ControlActivity extends AppCompatActivity {
             }
         });
 
+        ((Button) findViewById(R.id.testAlarmButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                BlockNotificationHelper.showTestNotification(context);
+                Toast.makeText(context, R.string.test_notification_sent, Toast.LENGTH_SHORT).show();
+            }
+        });
+
         CheckBox tercCheck = (CheckBox) findViewById(R.id.tercCheck);
         tercCheck.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override

@@ -59,11 +59,33 @@ public class Preferences {
      * must be torn down (smartlock disabled, timer stopped).
      */
     static private final String FORCE_CRITICAL_UNTIL = "FORCE_CRITICAL_UNTIL";
+    static private final String LAST_BLOCK_NOTIFICATION_MILLIS = "LAST_BLOCK_NOTIFICATION_MILLIS";
+    static private final String LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS = "LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS";
 
     private Context context;
 
     public Preferences(@NonNull Context context) {
         this.context = context;
+    }
+
+    public long getLastBlockNotificationMillis() {
+        return getPreferences().getLong(LAST_BLOCK_NOTIFICATION_MILLIS, 0L);
+    }
+
+    public void setLastBlockNotificationMillis(long millis) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putLong(LAST_BLOCK_NOTIFICATION_MILLIS, millis);
+        editor.apply();
+    }
+
+    public long getLastFallbackLockNotificationMillis() {
+        return getPreferences().getLong(LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS, 0L);
+    }
+
+    public void setLastFallbackLockNotificationMillis(long millis) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putLong(LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS, millis);
+        editor.apply();
     }
 
     public boolean doesPasswordHasDisablePeriod() {

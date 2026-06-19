@@ -490,6 +490,10 @@ public class Kernel {
      *                         what "success" looks like.
      */
     public void bringToFront(final String offendingPackage) {
+        if (offendingPackage != null) {
+            BlockNotificationHelper.notifyAppBlockedIfDue(context, offendingPackage, getPeriod());
+        }
+
         boolean a11yFired = MinimizeAccessibilityService.goHome();
         if (a11yFired) {
             Log.d("kernel", "bringToFront: GLOBAL_ACTION_HOME dispatched via accessibility");
@@ -535,6 +539,7 @@ public class Kernel {
                 }
                 Log.w("kernel", "bringToFront fallback: " + nowTop + " still on top - LOCKING");
                 log("bringToFront fallback: locking (" + nowTop + " would not minimize)");
+                BlockNotificationHelper.notifyFallbackLockIfDue(context, nowTop, getPeriod());
                 if (DeviceAdmin.isEnabled(context)) {
                     DeviceAdmin.lockNow(context);
                 } else {
