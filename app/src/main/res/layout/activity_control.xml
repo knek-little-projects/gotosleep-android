@@ -35,7 +35,13 @@
                 android:id="@+id/forceCriticalButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Force critical zone for 2 min" />
+                android:text="Force whitelist zone for 2 min" />
+
+            <Button
+                android:id="@+id/forceBlacklistButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="FORCE BLACKLIST ZONE FOR 2 MIN" />
 
             <Button
                 android:id="@+id/testAlarmButton"
@@ -414,24 +420,19 @@
                 android:inputType="textPersonName"
                 android:text="com.google.android.apps.nexuslauncher" />
 
-            <RadioGroup
-                android:id="@+id/homeLaunchersGroup"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent">
-
-            </RadioGroup>
-
-            <Button
-                android:id="@+id/showHomeLaunchersButton"
+            <TextView
+                android:id="@+id/redirectTargetLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="show home launchers" />
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="При срабатывании danger/critical зоны будет запущена активность: Danger Zone (список разрешённых приложений)" />
 
             <Button
                 android:id="@+id/anotherHomeButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="ANOTHER HOME" />
+                android:text="ANOTHER HOME (открыть Danger Zone)" />
 
             <LinearLayout
                 android:layout_width="match_parent"

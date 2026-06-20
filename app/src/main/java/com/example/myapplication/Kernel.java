@@ -54,27 +54,24 @@ public class Kernel {
         this.preferences = new Preferences(context);
     }
 
+    /**
+     * When Smartlock needs to eject the user to a "home" surface (period change, lock, etc.) we
+     * always send them to our own {@link DangerZoneActivity} (the filtered allow-list of apps for
+     * the current zone). Previously this could redirect to an external launcher chosen by the user,
+     * which caused a feedback loop in the whitelist/critical zone: we launched the external
+     * launcher, then immediately treated it as a forbidden foreground app and locked the device.
+     *
+     * @return always {@code true} (kept for callers that branch on the result).
+     */
     public boolean runAnotherHomeLauncher() {
-        String homeLauncher = preferences.getHomeLauncher();
-
-        if (homeLauncher == null) {
-            return false;
-        }
-
-        if (context.getPackageName().equals(homeLauncher)) {
-            showAppSelector();
-            return true;
-        }
-
-        if (preferences.getDangerProcessesSet().contains(homeLauncher)) {
-            return false;
-        }
-
-        return new HomeLauncher(context).runHomeLauncher(homeLauncher);
+        showAppSelector();
+        return true;
     }
 
     public void showAppSelector() {
-        context.startActivity(new Intent(context, DangerZoneActivity.class));
+        Intent intent = new Intent(context, DangerZoneActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
     }
 
     public Preferences getPreferences() {
@@ -178,7 +175,7 @@ public class Kernel {
             return DEBUG_PERIOD;
         }
 
-        // Debug/test override: the "Force critical for 2 min" button in ControlActivity sets
+        // Debug/test override: the "Force whitelist zone for 2 min" button in ControlActivity sets
         // a deadline in prefs. While it's active we short-circuit straight to CRITICAL_PERIOD;
         // once it expires we tear everything down (disable smartlock, stop timer) so the app
         // doesn't stay "locked" forever if the UI process died.
@@ -195,9 +192,27 @@ public class Kernel {
                 return CRITICAL_PERIOD;
             }
             // Expired: perform the documented teardown exactly once.
-            Log.i("kernel", "Force critical window expired - disabling smartlock");
-            log("Force critical expired - smartlock disabled");
+            Log.i("kernel", "Force whitelist window expired - disabling smartlock");
+            log("Force whitelist expired - smartlock disabled");
             preferences.setForceCriticalUntilMillis(0L);
+            preferences.setSmartLockEnabled(false);
+            preferences.setShouldTimerBeRunning(false);
+            return SAFE_PERIOD;
+        }
+
+        long forceDangerUntil = preferences.getForceDangerUntilMillis();
+        if (forceDangerUntil > 0) {
+            long nowMillis = System.currentTimeMillis();
+            if (nowMillis < forceDangerUntil) {
+                if (!preferences.isSmartLockEnabled()) {
+                    preferences.setForceDangerUntilMillis(0L);
+                    return SAFE_PERIOD;
+                }
+                return DANGER_PERIOD;
+            }
+            Log.i("kernel", "Force danger window expired - disabling smartlock");
+            log("Force danger expired - smartlock disabled");
+            preferences.setForceDangerUntilMillis(0L);
             preferences.setSmartLockEnabled(false);
             preferences.setShouldTimerBeRunning(false);
             return SAFE_PERIOD;

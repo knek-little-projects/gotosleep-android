@@ -30,9 +30,6 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -351,20 +348,21 @@ public class ControlActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.forceCriticalButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                // Debug helper: simulate critical-zone for exactly 2 minutes regardless of the
+                // Debug helper: simulate whitelist (critical) zone for exactly 2 minutes regardless of the
                 // configured safe/danger/critical times. Kernel.getPeriod() reads the deadline
                 // from prefs, so all three enforcement mechanisms (Timer/Worker/Alarm) will
-                // treat "now" as critical until the deadline passes. At that point Kernel's
+                // treat "now" as critical (whitelist) until the deadline passes. At that point Kernel's
                 // lazy check does the teardown; we ALSO schedule a UI-side teardown below so
                 // the user sees the checkbox flip back to off while this screen is open.
                 final long durationMs = 2 * 60 * 1000L;
                 final long expireAt = System.currentTimeMillis() + durationMs;
 
+                preferences.setForceDangerUntilMillis(0L);
                 preferences.setForceCriticalUntilMillis(expireAt);
                 preferences.setSmartLockEnabled(true);
                 smartLockCheck.setChecked(true);
                 ensureAllRunning();
-                Toast.makeText(context, "Critical zone forced for 2 minutes", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, "Whitelist zone forced for 2 minutes", Toast.LENGTH_SHORT).show();
 
                 new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
                     @Override
@@ -378,7 +376,35 @@ public class ControlActivity extends AppCompatActivity {
                         preferences.setShouldTimerBeRunning(false);
                         if (!isFinishing() && !isDestroyed()) {
                             smartLockCheck.setChecked(false);
-                            Toast.makeText(context, "Force critical expired", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(context, "Force whitelist expired", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }, durationMs);
+            }
+        });
+
+        ((Button) findViewById(R.id.forceBlacklistButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                final long durationMs = 2 * 60 * 1000L;
+                final long expireAt = System.currentTimeMillis() + durationMs;
+
+                preferences.setForceCriticalUntilMillis(0L);
+                preferences.setForceDangerUntilMillis(expireAt);
+                preferences.setSmartLockEnabled(true);
+                smartLockCheck.setChecked(true);
+                ensureAllRunning();
+                Toast.makeText(context, "Blacklist zone forced for 2 minutes", Toast.LENGTH_SHORT).show();
+
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        preferences.setForceDangerUntilMillis(0L);
+                        preferences.setSmartLockEnabled(false);
+                        preferences.setShouldTimerBeRunning(false);
+                        if (!isFinishing() && !isDestroyed()) {
+                            smartLockCheck.setChecked(false);
+                            Toast.makeText(context, "Force blacklist expired", Toast.LENGTH_SHORT).show();
                         }
                     }
                 }, durationMs);
@@ -446,46 +472,6 @@ public class ControlActivity extends AppCompatActivity {
                 requestQueue.add(stringRequest);
             }
         });
-
-        ((Button) findViewById(R.id.showHomeLaunchersButton)).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                RadioGroup homeLaunchersGroup = (RadioGroup) findViewById(R.id.homeLaunchersGroup);
-                homeLaunchersGroup.setOrientation(LinearLayout.VERTICAL);
-                String selectedHomeLauncher = preferences.getHomeLauncher();
-
-                int count = homeLaunchersGroup.getChildCount();
-                if (count > 0) {
-                    for (int i = count - 1; i >= 0; i--) {
-                        View o = homeLaunchersGroup.getChildAt(i);
-                        if (o instanceof RadioButton) {
-                            homeLaunchersGroup.removeViewAt(i);
-                        }
-                    }
-                }
-
-                final PackageManager packageManager = getPackageManager();
-                for (final ResolveInfo resolveInfo : packageManager.queryIntentActivities(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)) {
-                    String pkg = resolveInfo.activityInfo.packageName;
-                    final RadioButton btn = new RadioButton(context);
-                    btn.setText(pkg);
-                    btn.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-                        @Override
-                        public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                            if (b) {
-                                preferences.setHomeLauncher(btn.getText().toString());
-                            }
-                        }
-                    });
-                    homeLaunchersGroup.addView(btn);
-                    if (pkg.equals(selectedHomeLauncher)) {
-                        btn.setChecked(true);
-                    }
-                }
-            }
-        });
-
-        ((Button) findViewById(R.id.showHomeLaunchersButton)).performClick();
 
         ((Button) findViewById(R.id.enableAdminButton)).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -839,12 +825,7 @@ public class ControlActivity extends AppCompatActivity {
                                         }
                                         sb.append("\n");
 
-                                        sb.append("Home Launcher: ");
-                                        String hl = preferences.getHomeLauncher();
-                                        if (hl != null) {
-                                            sb.append(hl);
-                                        }
-                                        sb.append("\n");
+                                        sb.append("Redirect target: Danger Zone\n");
 
                                         sb.append("isMyAppLauncherDefault: ");
                                         sb.append(isMyAppLauncherDefault()).append("\n");

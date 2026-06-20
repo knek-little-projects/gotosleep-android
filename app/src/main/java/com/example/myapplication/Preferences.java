@@ -40,7 +40,6 @@ public class Preferences {
     static private final String SHOULD_TIMER_BE_RUNNING = "timer";
     static private final String TIMER_ID = "TIMER_ID";
     static private final String ENABLE_SMARTLOCK = "ENABLE_SMARTLOCK";
-    static private final String HOME_LAUNCHER = "HOME_LAUNCHER";
     static private final String DANGER_PROCESSES = "killProcessList";
     static private final String CRITICAL_PROCESSES = "CRITICAL_PROCESSES";
     static private final String LAST_CRITICAL_TIME = "LAST_CRITICAL_TIME";
@@ -53,12 +52,14 @@ public class Preferences {
     /** Per-package last launch time from Danger Zone list (epoch millis). Key = prefix + packageName. */
     static private final String DANGER_ZONE_LAST_LAUNCH_PREFIX = "DZ_LAST_";
     /**
-     * Epoch-millis deadline while we are simulating critical zone on user demand (the
-     * "Force critical for 2 min" debug button in ControlActivity). 0 means no override.
+     * Epoch-millis deadline while we are simulating whitelist (critical) zone on user demand (the
+     * "Force whitelist zone for 2 min" debug button in ControlActivity). 0 means no override.
      * When {@code now >= forceCriticalUntilMillis} the override is considered expired and
      * must be torn down (smartlock disabled, timer stopped).
      */
     static private final String FORCE_CRITICAL_UNTIL = "FORCE_CRITICAL_UNTIL";
+    /** Same pattern as {@link #FORCE_CRITICAL_UNTIL} — debug "Force blacklist zone for 2 min" button. */
+    static private final String FORCE_DANGER_UNTIL = "FORCE_DANGER_UNTIL";
     static private final String LAST_BLOCK_NOTIFICATION_MILLIS = "LAST_BLOCK_NOTIFICATION_MILLIS";
     static private final String LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS = "LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS";
 
@@ -121,6 +122,16 @@ public class Preferences {
     public void setForceCriticalUntilMillis(long epochMillis) {
         SharedPreferences.Editor editor = getPreferences().edit();
         editor.putLong(FORCE_CRITICAL_UNTIL, epochMillis);
+        editor.apply();
+    }
+
+    public long getForceDangerUntilMillis() {
+        return getPreferences().getLong(FORCE_DANGER_UNTIL, 0L);
+    }
+
+    public void setForceDangerUntilMillis(long epochMillis) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putLong(FORCE_DANGER_UNTIL, epochMillis);
         editor.apply();
     }
 
@@ -261,16 +272,6 @@ public class Preferences {
     public void setCriticalProcesses(ArrayList<String> items) {
         SharedPreferences.Editor editor = getPreferences().edit();
         editor.putString(CRITICAL_PROCESSES, TextUtils.join("\n", items));
-        editor.apply();
-    }
-
-    public String getHomeLauncher() {
-        return getPreferences().getString(HOME_LAUNCHER, null);
-    }
-
-    public void setHomeLauncher(String s) {
-        SharedPreferences.Editor editor = getPreferences().edit();
-        editor.putString(HOME_LAUNCHER, s);
         editor.apply();
     }
 
