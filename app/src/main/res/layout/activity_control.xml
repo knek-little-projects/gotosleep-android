@@ -17,6 +17,12 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <TextView
+                android:id="@+id/versionLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                tools:text="Version 1.0" />
+
             <Button
                 android:id="@+id/checkStatusButton"
                 android:layout_width="match_parent"

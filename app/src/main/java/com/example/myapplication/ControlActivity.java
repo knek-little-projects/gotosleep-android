@@ -302,6 +302,12 @@ public class ControlActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_control);
 
+        try {
+            String versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            ((TextView) findViewById(R.id.versionLabel)).setText("Version " + versionName);
+        } catch (PackageManager.NameNotFoundException ignored) {
+        }
+
         final Context context = this;
         kernel = new Kernel(context);
         preferences = new Preferences(context);
