@@ -5,7 +5,10 @@ import android.content.SharedPreferences;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.w3c.dom.Text;
 
 import java.io.File;
@@ -371,5 +374,62 @@ public class Preferences {
                 &&
                 today.get(Calendar.YEAR) == lastInstance.get(Calendar.YEAR)
                 ;
+    }
+
+    private static final int SETTINGS_EXPORT_VERSION = 1;
+
+    public JSONObject exportSettingsToJson() throws JSONException {
+        JSONObject obj = new JSONObject();
+        obj.put("version", SETTINGS_EXPORT_VERSION);
+        obj.put("safeTime", getSafeTime());
+        obj.put("dangerTime", getDangerTime());
+        obj.put("criticalTime", getCriticalTime());
+        obj.put("smartLockEnabled", isSmartLockEnabled());
+        obj.put("tercUse", isTercUse());
+        obj.put("tercActivityURL", getTERCActivityURL());
+        obj.put("failsafePassword", getFailsafePassword());
+        obj.put("dangerProcesses", getDangerProcessesString());
+        obj.put("criticalProcesses", getCriticalProcessesString());
+        obj.put("passwordDisablePeriodEnabled", doesPasswordHasDisablePeriod());
+        obj.put("passwordDisablePeriodStart", getPasswordDisablePeriodStart());
+        obj.put("passwordDisablePeriodEnd", getPasswordDisablePeriodEnd());
+        return obj;
+    }
+
+    /**
+     * @return null on success, otherwise an error message.
+     */
+    @Nullable
+    public String importSettingsFromJson(@NonNull JSONObject obj) {
+        int version = obj.optInt("version", 0);
+        if (version != SETTINGS_EXPORT_VERSION) {
+            return "Unsupported settings file version: " + version;
+        }
+
+        if (!setSafeTime(obj.optString("safeTime", defaultSafeTime))) {
+            return "Invalid safe time";
+        }
+        if (!setDangerTime(obj.optString("dangerTime", defaultDangerTime))) {
+            return "Invalid danger time";
+        }
+        if (!setCriticalTime(obj.optString("criticalTime", defaultCriticalTime))) {
+            return "Invalid critical time";
+        }
+
+        setSmartLockEnabled(obj.optBoolean("smartLockEnabled", false));
+        setTercUse(obj.optBoolean("tercUse", defaultUseTERC));
+        setTERCACtivityURL(obj.optString("tercActivityURL", defaultTERCActivityURL));
+        setFailsafePassword(obj.optString("failsafePassword", defaultFailsafePassword));
+        setDangerProcesses(obj.optString("dangerProcesses", ""));
+        setCriticalProcesses(obj.optString("criticalProcesses", ""));
+
+        String passwordStart = obj.optString("passwordDisablePeriodStart", "00:00");
+        String passwordEnd = obj.optString("passwordDisablePeriodEnd", "00:00");
+        if (!setPasswordDisablePeriodStart(passwordStart) || !setPasswordDisablePeriodEnd(passwordEnd)) {
+            return "Invalid password disable period";
+        }
+        setPasswordHasDisablePeriod(obj.optBoolean("passwordDisablePeriodEnabled", false));
+
+        return null;
     }
 }

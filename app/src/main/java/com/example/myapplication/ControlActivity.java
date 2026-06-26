@@ -19,6 +19,7 @@ import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Debug;
 import android.provider.Settings;
@@ -40,7 +41,13 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
+import org.json.JSONObject;
+
 import org.w3c.dom.Text;
+
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,6 +71,8 @@ public class ControlActivity extends AppCompatActivity {
 
     public static int REQUEST_BLACK_LIST = 1000;
     public static int REQUEST_WHITE_LIST = 1001;
+    public static int REQUEST_SAVE_SETTINGS_FILE = 1002;
+    public static int REQUEST_LOAD_SETTINGS_FILE = 1003;
 
     @Override
     protected void onResume() {
@@ -952,19 +961,123 @@ public class ControlActivity extends AppCompatActivity {
         });
 
         ((Button) findViewById(R.id.loadSettingsButton)).performClick();
+
+        ((Button) findViewById(R.id.saveSettingsToFileButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                saveAllSettingsFromUi();
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/json");
+                intent.putExtra(Intent.EXTRA_TITLE, "gotosleep-settings.json");
+                startActivityForResult(intent, REQUEST_SAVE_SETTINGS_FILE);
+            }
+        });
+
+        ((Button) findViewById(R.id.loadSettingsFromFileButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/json");
+                startActivityForResult(intent, REQUEST_LOAD_SETTINGS_FILE);
+            }
+        });
+    }
+
+    private void saveAllSettingsFromUi() {
+        ((Button) findViewById(R.id.saveSettingsButton)).performClick();
+        ((Button) findViewById(R.id.saveKillProcessListButton)).performClick();
+        ((Button) findViewById(R.id.disablePasswordSaveButton)).performClick();
+        ((Button) findViewById(R.id.failsafePasswordButton)).performClick();
+    }
+
+    private void refreshUiFromPreferences() {
+        ((Button) findViewById(R.id.loadSettingsButton)).performClick();
+        ((Button) findViewById(R.id.loadKillProcessList)).performClick();
+
+        ((CheckBox) findViewById(R.id.smartLockCheck)).setChecked(preferences.isSmartLockEnabled());
+        ((CheckBox) findViewById(R.id.tercCheck)).setChecked(preferences.isTercUse());
+        ((EditText) findViewById(R.id.editTercActivityURL)).setText(preferences.getTERCActivityURL());
+        ((CheckBox) findViewById(R.id.disablePassword)).setChecked(preferences.doesPasswordHasDisablePeriod());
+        ((EditText) findViewById(R.id.disablePasswordStart)).setText(preferences.getPasswordDisablePeriodStart());
+        ((EditText) findViewById(R.id.disablePasswordEnd)).setText(preferences.getPasswordDisablePeriodEnd());
+        ((TextView) findViewById(R.id.failsafePasswordEdit)).setText(preferences.getFailsafePassword());
+    }
+
+    private void writeSettingsToUri(Uri uri) {
+        try {
+            JSONObject json = preferences.exportSettingsToJson();
+            byte[] bytes = json.toString(2).getBytes(StandardCharsets.UTF_8);
+            OutputStream outputStream = getContentResolver().openOutputStream(uri);
+            if (outputStream == null) {
+                Toast.makeText(this, "Cannot write file", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            try {
+                outputStream.write(bytes);
+            } finally {
+                outputStream.close();
+            }
+            Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Log.e("ControlActivity", "writeSettingsToUri", e);
+        }
+    }
+
+    private void readSettingsFromUri(Uri uri) {
+        try {
+            InputStream inputStream = getContentResolver().openInputStream(uri);
+            if (inputStream == null) {
+                Toast.makeText(this, "Cannot read file", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            byte[] buffer = new byte[8192];
+            StringBuilder sb = new StringBuilder();
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                sb.append(new String(buffer, 0, read, StandardCharsets.UTF_8));
+            }
+            inputStream.close();
+
+            JSONObject json = new JSONObject(sb.toString());
+            String error = preferences.importSettingsFromJson(json);
+            if (error != null) {
+                Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                return;
+            }
+            refreshUiFromPreferences();
+            Toast.makeText(this, "Settings loaded", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Load failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Log.e("ControlActivity", "readSettingsFromUri", e);
+        }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (data == null) {
+        if (resultCode != RESULT_OK || data == null) {
             return;
         }
 
-        if (resultCode == 0) {
+        Uri uri = data.getData();
+        if (requestCode == REQUEST_SAVE_SETTINGS_FILE) {
+            if (uri != null) {
+                writeSettingsToUri(uri);
+            }
             return;
         }
+
+        if (requestCode == REQUEST_LOAD_SETTINGS_FILE) {
+            if (uri != null) {
+                readSettingsFromUri(uri);
+            }
+            return;
+        }
+
         if (requestCode == REQUEST_BLACK_LIST) {
             ArrayList<String> selectedApps = data.getStringArrayListExtra("selectedApps");
 

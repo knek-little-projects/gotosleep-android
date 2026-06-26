@@ -501,6 +501,18 @@
                         android:text="Save new failsafe password" />
                 </LinearLayout>
             </LinearLayout>
+
+            <Button
+                android:id="@+id/saveSettingsToFileButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Save to file..." />
+
+            <Button
+                android:id="@+id/loadSettingsFromFileButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Load from file..." />
         </LinearLayout>
 
 
