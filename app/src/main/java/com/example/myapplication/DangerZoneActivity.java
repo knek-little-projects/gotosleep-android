@@ -97,6 +97,22 @@ public class DangerZoneActivity extends AppCompatActivity {
                 }
             }
         });
+
+        ((Button) findViewById(R.id.blacklistOnDemandPasswordButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Preferences preferences = new Preferences(context);
+                TextView textView = (TextView) findViewById(R.id.blacklistOnDemandPasswordEdit);
+
+                if (preferences.checkBlacklistOnDemandPassword(textView.getText().toString())) {
+                    int minutes = preferences.getBlacklistOnDemandTimeoutMinutes();
+                    preferences.setBlacklistOnDemandUntilMillis(System.currentTimeMillis() + minutes * 60_000L);
+                    Toast.makeText(context, "Blacklist mode for " + minutes + " minutes", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(context, "Wrong password!", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
     }
 
     private void updateContainerVisibility() {

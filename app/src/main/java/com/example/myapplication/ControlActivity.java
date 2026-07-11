@@ -90,6 +90,12 @@ public class ControlActivity extends AppCompatActivity {
         TextView failsafePasswordEdit = (TextView) findViewById(R.id.failsafePasswordEdit);
         failsafePasswordEdit.setText(preferences.getFailsafePassword());
 
+        TextView blacklistOnDemandPasswordEdit = (TextView) findViewById(R.id.blacklistOnDemandPasswordEdit);
+        blacklistOnDemandPasswordEdit.setText(preferences.getBlacklistOnDemandPassword());
+
+        TextView blacklistOnDemandTimeoutMinutesEdit = (TextView) findViewById(R.id.blacklistOnDemandTimeoutMinutesEdit);
+        blacklistOnDemandTimeoutMinutesEdit.setText(String.valueOf(preferences.getBlacklistOnDemandTimeoutMinutes()));
+
         TextView tercActivityURL = (TextView) findViewById(R.id.editTercActivityURL);
         tercActivityURL.setText(preferences.getTERCActivityURL());
 
@@ -574,6 +580,24 @@ public class ControlActivity extends AppCompatActivity {
             }
         });
 
+        ((Button) findViewById(R.id.blacklistOnDemandPasswordButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                TextView passwordEdit = (TextView) findViewById(R.id.blacklistOnDemandPasswordEdit);
+                preferences.setBlacklistOnDemandPassword(passwordEdit.getText().toString());
+
+                TextView timeoutEdit = (TextView) findViewById(R.id.blacklistOnDemandTimeoutMinutesEdit);
+                int minutes;
+                try {
+                    minutes = Integer.parseInt(timeoutEdit.getText().toString().trim());
+                } catch (NumberFormatException e) {
+                    minutes = Preferences.defaultBlacklistOnDemandTimeoutMinutes;
+                }
+                preferences.setBlacklistOnDemandTimeoutMinutes(minutes);
+                timeoutEdit.setText(String.valueOf(minutes));
+            }
+        });
+
         ((Button) findViewById(R.id.homeButton)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -990,6 +1014,7 @@ public class ControlActivity extends AppCompatActivity {
         ((Button) findViewById(R.id.saveKillProcessListButton)).performClick();
         ((Button) findViewById(R.id.disablePasswordSaveButton)).performClick();
         ((Button) findViewById(R.id.failsafePasswordButton)).performClick();
+        ((Button) findViewById(R.id.blacklistOnDemandPasswordButton)).performClick();
     }
 
     private void refreshUiFromPreferences() {
@@ -1003,6 +1028,8 @@ public class ControlActivity extends AppCompatActivity {
         ((EditText) findViewById(R.id.disablePasswordStart)).setText(preferences.getPasswordDisablePeriodStart());
         ((EditText) findViewById(R.id.disablePasswordEnd)).setText(preferences.getPasswordDisablePeriodEnd());
         ((TextView) findViewById(R.id.failsafePasswordEdit)).setText(preferences.getFailsafePassword());
+        ((TextView) findViewById(R.id.blacklistOnDemandPasswordEdit)).setText(preferences.getBlacklistOnDemandPassword());
+        ((TextView) findViewById(R.id.blacklistOnDemandTimeoutMinutesEdit)).setText(String.valueOf(preferences.getBlacklistOnDemandTimeoutMinutes()));
     }
 
     private void writeSettingsToUri(Uri uri) {

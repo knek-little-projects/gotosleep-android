@@ -86,7 +86,7 @@ public class SelectMultipleActivities extends AppCompatActivity {
             public void onClick(View view) {
                 Intent intent = new Intent();
                 intent.putStringArrayListExtra("selectedApps", null);
-                setResult(0, intent);
+                setResult(RESULT_CANCELED, intent);
                 finish();
             }
         });
@@ -96,7 +96,7 @@ public class SelectMultipleActivities extends AppCompatActivity {
             public void onClick(View view) {
                 Intent intent = new Intent();
                 intent.putStringArrayListExtra("selectedApps", new ArrayList<>(selectedApps));
-                setResult(1, intent);
+                setResult(RESULT_OK, intent);
                 finish();
             }
         });

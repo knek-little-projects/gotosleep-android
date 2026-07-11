@@ -500,6 +500,43 @@
                         android:layout_height="wrap_content"
                         android:text="Save new failsafe password" />
                 </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    >
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Blacklist-on-demand password:" />
+
+                    <EditText
+                        android:id="@+id/blacklistOnDemandPasswordEdit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#BCD4E4"
+                        android:ems="10"
+                        android:gravity="start|top" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Blacklist-on-demand timeout (minutes):" />
+
+                    <EditText
+                        android:id="@+id/blacklistOnDemandTimeoutMinutesEdit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number" />
+
+                    <Button
+                        android:id="@+id/blacklistOnDemandPasswordButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Save blacklist-on-demand settings" />
+                </LinearLayout>
             </LinearLayout>
 
             <Button

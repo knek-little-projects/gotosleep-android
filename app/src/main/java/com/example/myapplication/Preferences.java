@@ -27,6 +27,8 @@ public class Preferences {
     static public final String defaultTimeZone = "Europe/Moscow";
     static public final String defaultLogFileName = "log.txt";
     static public final String defaultFailsafePassword = "";
+    static public final String defaultBlacklistOnDemandPassword = "";
+    static public final int defaultBlacklistOnDemandTimeoutMinutes = 60;
     static public final String defaultTERCActivityURL = "http://18.133.52.116:12345/check-allowed/activity";
     static public final Boolean defaultUseTERC = false;
     static public final Boolean defaultIsTERCActivityAllowed = false;
@@ -63,6 +65,16 @@ public class Preferences {
     static private final String FORCE_CRITICAL_UNTIL = "FORCE_CRITICAL_UNTIL";
     /** Same pattern as {@link #FORCE_CRITICAL_UNTIL} — debug "Force blacklist zone for 2 min" button. */
     static private final String FORCE_DANGER_UNTIL = "FORCE_DANGER_UNTIL";
+    static private final String BLACKLIST_ON_DEMAND_PASSWORD = "BLACKLIST_ON_DEMAND_PASSWORD";
+    static private final String BLACKLIST_ON_DEMAND_TIMEOUT_MINUTES = "BLACKLIST_ON_DEMAND_TIMEOUT_MINUTES";
+    /**
+     * Epoch-millis deadline for the user-facing "blacklist on demand" password (entered in
+     * DangerZoneActivity). Unlike {@link #FORCE_DANGER_UNTIL}, reaching this deadline does NOT
+     * touch {@link #ENABLE_SMARTLOCK} or the timer — it only clears itself, and getPeriod() falls
+     * straight back through to the normal time-based rules. While active it forces DANGER_PERIOD
+     * regardless of the real current time/period (safe, danger or critical).
+     */
+    static private final String BLACKLIST_ON_DEMAND_UNTIL = "BLACKLIST_ON_DEMAND_UNTIL";
     static private final String LAST_BLOCK_NOTIFICATION_MILLIS = "LAST_BLOCK_NOTIFICATION_MILLIS";
     static private final String LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS = "LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS";
 
@@ -215,6 +227,40 @@ public class Preferences {
 
     public Boolean checkFailsafePassword(String password) {
         return password.trim().equals(getFailsafePassword().trim());
+    }
+
+    public void setBlacklistOnDemandPassword(String password) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putString(BLACKLIST_ON_DEMAND_PASSWORD, password);
+        editor.apply();
+    }
+
+    public String getBlacklistOnDemandPassword() {
+        return getPreferences().getString(BLACKLIST_ON_DEMAND_PASSWORD, defaultBlacklistOnDemandPassword);
+    }
+
+    public Boolean checkBlacklistOnDemandPassword(String password) {
+        return password.trim().equals(getBlacklistOnDemandPassword().trim());
+    }
+
+    public void setBlacklistOnDemandTimeoutMinutes(int minutes) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putInt(BLACKLIST_ON_DEMAND_TIMEOUT_MINUTES, minutes);
+        editor.apply();
+    }
+
+    public int getBlacklistOnDemandTimeoutMinutes() {
+        return getPreferences().getInt(BLACKLIST_ON_DEMAND_TIMEOUT_MINUTES, defaultBlacklistOnDemandTimeoutMinutes);
+    }
+
+    public long getBlacklistOnDemandUntilMillis() {
+        return getPreferences().getLong(BLACKLIST_ON_DEMAND_UNTIL, 0L);
+    }
+
+    public void setBlacklistOnDemandUntilMillis(long epochMillis) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putLong(BLACKLIST_ON_DEMAND_UNTIL, epochMillis);
+        editor.apply();
     }
 
     public Set<String> getDangerProcessesSet() {
@@ -388,6 +434,8 @@ public class Preferences {
         obj.put("tercUse", isTercUse());
         obj.put("tercActivityURL", getTERCActivityURL());
         obj.put("failsafePassword", getFailsafePassword());
+        obj.put("blacklistOnDemandPassword", getBlacklistOnDemandPassword());
+        obj.put("blacklistOnDemandTimeoutMinutes", getBlacklistOnDemandTimeoutMinutes());
         obj.put("dangerProcesses", getDangerProcessesString());
         obj.put("criticalProcesses", getCriticalProcessesString());
         obj.put("passwordDisablePeriodEnabled", doesPasswordHasDisablePeriod());
@@ -420,6 +468,8 @@ public class Preferences {
         setTercUse(obj.optBoolean("tercUse", defaultUseTERC));
         setTERCACtivityURL(obj.optString("tercActivityURL", defaultTERCActivityURL));
         setFailsafePassword(obj.optString("failsafePassword", defaultFailsafePassword));
+        setBlacklistOnDemandPassword(obj.optString("blacklistOnDemandPassword", defaultBlacklistOnDemandPassword));
+        setBlacklistOnDemandTimeoutMinutes(obj.optInt("blacklistOnDemandTimeoutMinutes", defaultBlacklistOnDemandTimeoutMinutes));
         setDangerProcesses(obj.optString("dangerProcesses", ""));
         setCriticalProcesses(obj.optString("criticalProcesses", ""));
 

@@ -175,6 +175,19 @@ public class Kernel {
             return DEBUG_PERIOD;
         }
 
+        // User-facing "blacklist on demand" password (DangerZoneActivity). Checked before every
+        // other override so it always wins regardless of the real current period (safe, danger or
+        // critical) or of any debug force-* override below. Unlike the debug force-* mechanisms,
+        // expiry does NOT touch smartlock/timer state - it just clears itself and falls through to
+        // whatever the rest of this method would normally decide.
+        long blacklistOnDemandUntil = preferences.getBlacklistOnDemandUntilMillis();
+        if (blacklistOnDemandUntil > 0) {
+            if (System.currentTimeMillis() < blacklistOnDemandUntil) {
+                return DANGER_PERIOD;
+            }
+            preferences.setBlacklistOnDemandUntilMillis(0L);
+        }
+
         // Debug/test override: the "Force whitelist zone for 2 min" button in ControlActivity sets
         // a deadline in prefs. While it's active we short-circuit straight to CRITICAL_PERIOD;
         // once it expires we tear everything down (disable smartlock, stop timer) so the app
