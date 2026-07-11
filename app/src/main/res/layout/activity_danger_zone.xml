@@ -45,25 +45,4 @@
             android:text="Unlock" />
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/blacklistOnDemandContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <EditText
-            android:id="@+id/blacklistOnDemandPasswordEdit"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="#BCD4E4"
-            android:ems="10"
-            android:gravity="start|top" />
-
-        <Button
-            android:id="@+id/blacklistOnDemandPasswordButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Blacklist for a while" />
-    </LinearLayout>
-
 </LinearLayout>
