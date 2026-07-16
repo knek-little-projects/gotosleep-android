@@ -2,13 +2,17 @@ package com.example.myapplication;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -24,29 +28,51 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class DangerZoneActivity extends AppCompatActivity {
     private static final int FILTER_DEBOUNCE_MS = 220;
-    private static final int PAGE_ICONS = 0;
-    private static final int PAGE_UNLOCK = 1;
 
-    private EditText editAppLaunchSearch;
+    private static final int PAGE_ICONS = 0;
+    private static final int PAGE_PDF = 1;
+    private static final int PAGE_UNLOCK = 2;
+    private static final int REAL_PAGE_COUNT = 3;
+    private static final int VIRTUAL_ITEM_COUNT = REAL_PAGE_COUNT * 100_000;
+    private static final int START_POSITION = (VIRTUAL_ITEM_COUNT / 2 / REAL_PAGE_COUNT) * REAL_PAGE_COUNT;
+
     private Kernel kernel;
     private Context context;
     private PackageManager pm;
 
     private ViewPager2 pager;
-    private DangerZonePagerAdapter pagerAdapter;
 
+    // Icons page
+    private EditText editAppLaunchSearch;
     private DangerZoneAppAdapter adapter;
     private final List<String> filteredPackages = new ArrayList<>();
-
     private final Handler debounceHandler = new Handler(Looper.getMainLooper());
-    private Runnable pendingFilter;
+    private Runnable pendingIconFilter;
+
+    // PDF page
+    private EditText editPdfSearch;
+    private PdfListAdapter pdfAdapter;
+    private TextView pdfScanStatus;
+    private Button pdfRefreshButton;
+    private PdfCache pdfCache;
+    private ExecutorService pdfExecutor;
+    private volatile boolean pdfScanInProgress;
+    private Runnable pendingPdfFilter;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    // Unlock page
+    private View unlockInputContainer;
+    private TextView unlockDisabledMessage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,10 +82,12 @@ public class DangerZoneActivity extends AppCompatActivity {
         context = this;
         pm = getPackageManager();
         kernel = new Kernel(context);
+        pdfCache = new PdfCache(context);
+        pdfExecutor = Executors.newSingleThreadExecutor();
 
-        pagerAdapter = new DangerZonePagerAdapter();
         pager = findViewById(R.id.dangerZonePager);
-        pager.setAdapter(pagerAdapter);
+        pager.setAdapter(new DangerZonePagerAdapter());
+        pager.setCurrentItem(START_POSITION, false);
     }
 
     private void setupIconsPage(@NonNull View view) {
@@ -80,7 +108,7 @@ public class DangerZoneActivity extends AppCompatActivity {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                scheduleFilter(s != null ? s.toString() : "");
+                scheduleIconFilter(s != null ? s.toString() : "");
             }
 
             @Override
@@ -91,7 +119,7 @@ public class DangerZoneActivity extends AppCompatActivity {
         editAppLaunchSearch.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView view, int actionId, KeyEvent keyEvent) {
-                cancelPendingFilter();
+                cancelPendingIconFilter();
                 applyFilter(view.getText().toString());
                 return false;
             }
@@ -100,7 +128,60 @@ public class DangerZoneActivity extends AppCompatActivity {
         applyFilter("");
     }
 
+    private void setupPdfPage(@NonNull View view) {
+        editPdfSearch = view.findViewById(R.id.editPdfSearch);
+        pdfScanStatus = view.findViewById(R.id.pdfScanStatus);
+        pdfRefreshButton = view.findViewById(R.id.pdfRefreshButton);
+
+        RecyclerView recyclerView = view.findViewById(R.id.pdfRecyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        pdfAdapter = new PdfListAdapter(this, this::onPdfClicked);
+        recyclerView.setAdapter(pdfAdapter);
+
+        editPdfSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                schedulePdfFilter(s != null ? s.toString() : "");
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+
+        editPdfSearch.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView view, int actionId, KeyEvent keyEvent) {
+                cancelPendingPdfFilter();
+                applyPdfFilter(view.getText().toString());
+                return false;
+            }
+        });
+
+        pdfRefreshButton.setOnClickListener(v -> triggerPdfScan());
+
+        pdfExecutor.execute(() -> {
+            boolean firstRun = !pdfCache.cacheFileExists();
+            pdfCache.load();
+            List<String> sorted = pdfCache.getSortedPaths();
+            mainHandler.post(() -> {
+                pdfAdapter.setItems(sorted);
+                applyPdfFilter(editPdfSearch.getText().toString());
+            });
+            if (firstRun) {
+                runPdfScan();
+            }
+        });
+    }
+
     private void setupUnlockPage(@NonNull View view) {
+        unlockInputContainer = view.findViewById(R.id.unlockInputContainer);
+        unlockDisabledMessage = view.findViewById(R.id.unlockDisabledMessage);
+
         EditText failsafePasswordEdit = view.findViewById(R.id.failsafePasswordEdit);
         failsafePasswordEdit.setTransformationMethod(new AsteriskPasswordTransformationMethod());
 
@@ -122,36 +203,155 @@ public class DangerZoneActivity extends AppCompatActivity {
                 }
             }
         });
+
+        refreshUnlockGating();
+    }
+
+    private void refreshUnlockGating() {
+        if (unlockInputContainer == null) {
+            return;
+        }
+        if (kernel.isPasswordDisabled()) {
+            unlockInputContainer.setVisibility(View.GONE);
+            unlockDisabledMessage.setText("Unlock disabled until " + kernel.getPreferences().getPasswordDisablePeriodEnd());
+            unlockDisabledMessage.setVisibility(View.VISIBLE);
+        } else {
+            unlockInputContainer.setVisibility(View.VISIBLE);
+            unlockDisabledMessage.setVisibility(View.GONE);
+        }
+    }
+
+    private void onPdfClicked(@NonNull String path) {
+        // In-memory only (cheap map mutation) so the re-sort below immediately reflects it;
+        // the JSON file is flushed to disk lazily in onPause(), not on every click.
+        pdfCache.recordClick(path);
+        applyPdfFilter(editPdfSearch.getText().toString());
+        openPdf(path);
+    }
+
+    private void openPdf(@NonNull String path) {
+        File file = new File(path);
+        Uri uri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", file);
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, "application/pdf");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(context, "No app found to open PDF files", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void triggerPdfScan() {
+        if (pdfScanInProgress) {
+            return;
+        }
+        if (!PdfFileFinder.hasAllFilesAccess()) {
+            Toast.makeText(context, "Grant \"all files access\" in Controls first", Toast.LENGTH_LONG).show();
+            return;
+        }
+        runPdfScan();
+    }
+
+    private void runPdfScan() {
+        pdfScanInProgress = true;
+        mainHandler.post(() -> {
+            pdfScanStatus.setVisibility(View.VISIBLE);
+            pdfRefreshButton.setEnabled(false);
+        });
+
+        pdfExecutor.execute(() -> {
+            String folder = kernel.getPreferences().getPdfFolderPath();
+            if (PdfFileFinder.isPathAllowed(folder)) {
+                List<PdfFileFinder.Entry> scanned = PdfFileFinder.scan(folder);
+                pdfCache.mergeScanResults(scanned);
+                pdfCache.flushToDisk();
+            }
+            List<String> sorted = pdfCache.getSortedPaths();
+
+            mainHandler.post(() -> {
+                pdfAdapter.setItems(sorted);
+                applyPdfFilter(editPdfSearch != null ? editPdfSearch.getText().toString() : "");
+                pdfScanStatus.setVisibility(View.GONE);
+                pdfRefreshButton.setEnabled(true);
+                pdfScanInProgress = false;
+            });
+        });
+    }
+
+    private void applyPdfFilter(@NonNull String search) {
+        if (pdfAdapter == null) {
+            return;
+        }
+        String needle = search.trim().toLowerCase();
+        List<String> all = pdfCache.getSortedPaths();
+        if (needle.isEmpty()) {
+            pdfAdapter.setItems(all);
+            return;
+        }
+        List<String> filtered = new ArrayList<>();
+        for (String path : all) {
+            if (new File(path).getName().toLowerCase().contains(needle)) {
+                filtered.add(path);
+            }
+        }
+        pdfAdapter.setItems(filtered);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        pagerAdapter.notifyDataSetChanged();
+        refreshUnlockGating();
         if (editAppLaunchSearch != null) {
             applyFilter(editAppLaunchSearch.getText().toString());
         }
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        if (pdfExecutor != null) {
+            pdfExecutor.execute(() -> pdfCache.flushToDisk());
+        }
+    }
+
+    @Override
     protected void onDestroy() {
-        cancelPendingFilter();
+        cancelPendingIconFilter();
+        cancelPendingPdfFilter();
         if (adapter != null) {
             adapter.shutdown();
+        }
+        if (pdfExecutor != null) {
+            pdfExecutor.shutdown();
         }
         super.onDestroy();
     }
 
-    private void scheduleFilter(@NonNull final String query) {
-        cancelPendingFilter();
-        pendingFilter = () -> applyFilter(query);
-        debounceHandler.postDelayed(pendingFilter, FILTER_DEBOUNCE_MS);
+    private void scheduleIconFilter(@NonNull final String query) {
+        cancelPendingIconFilter();
+        pendingIconFilter = () -> applyFilter(query);
+        debounceHandler.postDelayed(pendingIconFilter, FILTER_DEBOUNCE_MS);
     }
 
-    private void cancelPendingFilter() {
-        if (pendingFilter != null) {
-            debounceHandler.removeCallbacks(pendingFilter);
-            pendingFilter = null;
+    private void cancelPendingIconFilter() {
+        if (pendingIconFilter != null) {
+            debounceHandler.removeCallbacks(pendingIconFilter);
+            pendingIconFilter = null;
+        }
+    }
+
+    private void schedulePdfFilter(@NonNull final String query) {
+        cancelPendingPdfFilter();
+        pendingPdfFilter = () -> applyPdfFilter(query);
+        debounceHandler.postDelayed(pendingPdfFilter, FILTER_DEBOUNCE_MS);
+    }
+
+    private void cancelPendingPdfFilter() {
+        if (pendingPdfFilter != null) {
+            debounceHandler.removeCallbacks(pendingPdfFilter);
+            pendingPdfFilter = null;
         }
     }
 
@@ -194,19 +394,21 @@ public class DangerZoneActivity extends AppCompatActivity {
     }
 
     /**
-     * Two static pages: app icons, and the unlock-password panel. The unlock
-     * page is omitted entirely (itemCount drops to 1) during configured
-     * password-disabled windows, matching the old container-visibility gating.
+     * Circular 3-page carousel (icons / pdf / unlock): itemCount is a large constant so the
+     * pager can be swiped in either direction effectively forever, with the real page always
+     * {@code position % REAL_PAGE_COUNT}. Keeping itemCount constant means it never needs
+     * notifyDataSetChanged - the unlock page's password-disabled window is gated by hiding its
+     * content (see refreshUnlockGating), not by removing it from the cycle.
      */
     private class DangerZonePagerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         @Override
         public int getItemViewType(int position) {
-            return position;
+            return position % REAL_PAGE_COUNT;
         }
 
         @Override
         public int getItemCount() {
-            return kernel.isPasswordDisabled() ? 1 : 2;
+            return VIRTUAL_ITEM_COUNT;
         }
 
         @NonNull
@@ -216,6 +418,11 @@ public class DangerZoneActivity extends AppCompatActivity {
             if (viewType == PAGE_ICONS) {
                 View view = inflater.inflate(R.layout.panel_danger_zone_icons, parent, false);
                 setupIconsPage(view);
+                return new RecyclerView.ViewHolder(view) {
+                };
+            } else if (viewType == PAGE_PDF) {
+                View view = inflater.inflate(R.layout.panel_danger_zone_pdf, parent, false);
+                setupPdfPage(view);
                 return new RecyclerView.ViewHolder(view) {
                 };
             } else {

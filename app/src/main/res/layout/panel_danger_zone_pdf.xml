@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <EditText
+        android:id="@+id/editPdfSearch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ems="10"
+        android:hint="Search by file name"
+        android:imeOptions="actionSearch"
+        android:inputType="text|textNoSuggestions" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/pdfRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:scrollbars="vertical" />
+
+    <TextView
+        android:id="@+id/pdfScanStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="Scanning..."
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/pdfRefreshButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Refresh" />
+
+</LinearLayout>

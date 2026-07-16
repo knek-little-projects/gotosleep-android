@@ -2,6 +2,7 @@ package com.example.myapplication;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Environment;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
@@ -77,6 +78,8 @@ public class Preferences {
     static private final String BLACKLIST_ON_DEMAND_UNTIL = "BLACKLIST_ON_DEMAND_UNTIL";
     static private final String LAST_BLOCK_NOTIFICATION_MILLIS = "LAST_BLOCK_NOTIFICATION_MILLIS";
     static private final String LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS = "LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS";
+    /** User-configurable root folder the PDF panel scans recursively. Empty = use the Downloads default. */
+    static private final String PDF_FOLDER_PATH = "PDF_FOLDER_PATH";
 
     private Context context;
 
@@ -263,6 +266,20 @@ public class Preferences {
         editor.apply();
     }
 
+    public String getPdfFolderPath() {
+        String stored = getPreferences().getString(PDF_FOLDER_PATH, "");
+        if (!stored.isEmpty()) {
+            return stored;
+        }
+        return Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath();
+    }
+
+    public void setPdfFolderPath(String path) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putString(PDF_FOLDER_PATH, path);
+        editor.apply();
+    }
+
     public Set<String> getDangerProcessesSet() {
         Set<String> hs = new HashSet<>(Arrays.asList(getDangerProcessesString().split("\\s+")));
         hs.remove("");
@@ -441,6 +458,7 @@ public class Preferences {
         obj.put("passwordDisablePeriodEnabled", doesPasswordHasDisablePeriod());
         obj.put("passwordDisablePeriodStart", getPasswordDisablePeriodStart());
         obj.put("passwordDisablePeriodEnd", getPasswordDisablePeriodEnd());
+        obj.put("pdfFolderPath", getPdfFolderPath());
         return obj;
     }
 
@@ -479,6 +497,7 @@ public class Preferences {
             return "Invalid password disable period";
         }
         setPasswordHasDisablePeriod(obj.optBoolean("passwordDisablePeriodEnabled", false));
+        setPdfFolderPath(obj.optString("pdfFolderPath", getPdfFolderPath()));
 
         return null;
     }

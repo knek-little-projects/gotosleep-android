@@ -96,6 +96,9 @@ public class ControlActivity extends AppCompatActivity {
         TextView blacklistOnDemandTimeoutMinutesEdit = (TextView) findViewById(R.id.blacklistOnDemandTimeoutMinutesEdit);
         blacklistOnDemandTimeoutMinutesEdit.setText(String.valueOf(preferences.getBlacklistOnDemandTimeoutMinutes()));
 
+        TextView pdfFolderPathEdit = (TextView) findViewById(R.id.pdfFolderPathEdit);
+        pdfFolderPathEdit.setText(preferences.getPdfFolderPath());
+
         TextView tercActivityURL = (TextView) findViewById(R.id.editTercActivityURL);
         tercActivityURL.setText(preferences.getTERCActivityURL());
 
@@ -569,6 +572,49 @@ public class ControlActivity extends AppCompatActivity {
                 } catch (Exception e) {
                     Toast.makeText(context, "Cannot open accessibility settings: " + e, Toast.LENGTH_LONG).show();
                 }
+            }
+        });
+
+        ((Button) findViewById(R.id.allFilesAccessButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
+                    Toast.makeText(context, "Not needed on this Android version", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (PdfFileFinder.hasAllFilesAccess()) {
+                    Toast.makeText(context, "Already granted", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                try {
+                    Intent intent = new Intent(
+                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:" + context.getPackageName()));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    try {
+                        Intent fallback = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                        fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        context.startActivity(fallback);
+                    } catch (Exception e2) {
+                        Toast.makeText(context, "Cannot open all-files-access settings: " + e2, Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+        });
+
+        ((Button) findViewById(R.id.pdfFolderPathButton)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                TextView pathEdit = (TextView) findViewById(R.id.pdfFolderPathEdit);
+                String path = pathEdit.getText().toString().trim();
+                if (!PdfFileFinder.isPathAllowed(path)) {
+                    Toast.makeText(context, "Path must be inside external storage", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                preferences.setPdfFolderPath(path);
+                Toast.makeText(context, "PDF folder saved", Toast.LENGTH_SHORT).show();
             }
         });
 

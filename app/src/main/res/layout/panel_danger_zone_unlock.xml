@@ -7,20 +7,36 @@
     android:gravity="center"
     android:padding="24dp">
 
-    <EditText
-        android:id="@+id/failsafePasswordEdit"
+    <LinearLayout
+        android:id="@+id/unlockInputContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#E4BCBC"
-        android:ems="10"
-        android:gravity="center"
-        android:inputType="textPassword" />
+        android:orientation="vertical"
+        android:gravity="center">
 
-    <Button
-        android:id="@+id/failsafePasswordButton"
-        android:layout_width="wrap_content"
+        <EditText
+            android:id="@+id/failsafePasswordEdit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#E4BCBC"
+            android:ems="10"
+            android:gravity="center"
+            android:inputType="textPassword" />
+
+        <Button
+            android:id="@+id/failsafePasswordButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Unlock" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/unlockDisabledMessage"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Unlock" />
+        android:gravity="center"
+        android:visibility="gone" />
 
 </LinearLayout>
