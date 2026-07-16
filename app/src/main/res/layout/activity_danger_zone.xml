@@ -1,48 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.viewpager2.widget.ViewPager2 xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/dangerZoneContainer"
+    android:id="@+id/dangerZonePager"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    tools:context=".DangerZoneActivity">
-
-    <EditText
-        android:id="@+id/editAppLaunchSearch"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ems="10"
-        android:hint="Search by package name"
-        android:imeOptions="actionSearch"
-        android:inputType="text|textNoSuggestions" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/dangerZoneRecyclerView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:scrollbars="vertical" />
-
-    <LinearLayout
-        android:id="@+id/disablePasswordContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <EditText
-            android:id="@+id/failsafePasswordEdit"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="#E4BCBC"
-            android:ems="10"
-            android:gravity="start|top" />
-
-        <Button
-            android:id="@+id/failsafePasswordButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Unlock" />
-    </LinearLayout>
-
-</LinearLayout>
+    tools:context=".DangerZoneActivity" />

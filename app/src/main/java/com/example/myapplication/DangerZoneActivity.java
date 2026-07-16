@@ -4,9 +4,9 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -14,11 +14,13 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.text.method.PasswordTransformationMethod;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,11 +31,16 @@ import java.util.List;
 
 public class DangerZoneActivity extends AppCompatActivity {
     private static final int FILTER_DEBOUNCE_MS = 220;
+    private static final int PAGE_ICONS = 0;
+    private static final int PAGE_UNLOCK = 1;
 
     private EditText editAppLaunchSearch;
     private Kernel kernel;
     private Context context;
     private PackageManager pm;
+
+    private ViewPager2 pager;
+    private DangerZonePagerAdapter pagerAdapter;
 
     private DangerZoneAppAdapter adapter;
     private final List<String> filteredPackages = new ArrayList<>();
@@ -48,10 +55,17 @@ public class DangerZoneActivity extends AppCompatActivity {
 
         context = this;
         pm = getPackageManager();
-        editAppLaunchSearch = (EditText) findViewById(R.id.editAppLaunchSearch);
         kernel = new Kernel(context);
 
-        RecyclerView recyclerView = findViewById(R.id.dangerZoneRecyclerView);
+        pagerAdapter = new DangerZonePagerAdapter();
+        pager = findViewById(R.id.dangerZonePager);
+        pager.setAdapter(pagerAdapter);
+    }
+
+    private void setupIconsPage(@NonNull View view) {
+        editAppLaunchSearch = view.findViewById(R.id.editAppLaunchSearch);
+
+        RecyclerView recyclerView = view.findViewById(R.id.dangerZoneRecyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new DangerZoneAppAdapter(this, pm, pkg -> {
             kernel.getPreferences().recordDangerZoneLaunch(pkg);
@@ -83,12 +97,18 @@ public class DangerZoneActivity extends AppCompatActivity {
             }
         });
 
-        ((Button) findViewById(R.id.failsafePasswordButton)).setOnClickListener(new View.OnClickListener() {
+        applyFilter("");
+    }
+
+    private void setupUnlockPage(@NonNull View view) {
+        EditText failsafePasswordEdit = view.findViewById(R.id.failsafePasswordEdit);
+        failsafePasswordEdit.setTransformationMethod(new AsteriskPasswordTransformationMethod());
+
+        ((Button) view.findViewById(R.id.failsafePasswordButton)).setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view) {
+            public void onClick(View v) {
                 Preferences preferences = new Preferences(context);
-                TextView textView = (TextView) findViewById(R.id.failsafePasswordEdit);
-                String entered = textView.getText().toString();
+                String entered = failsafePasswordEdit.getText().toString();
 
                 if (preferences.checkFailsafePassword(entered)) {
                     preferences.setSmartLockEnabled(false);
@@ -104,20 +124,13 @@ public class DangerZoneActivity extends AppCompatActivity {
         });
     }
 
-    private void updateContainerVisibility() {
-        LinearLayout disablePasswordContainer = (LinearLayout) findViewById(R.id.disablePasswordContainer);
-        if (kernel.isPasswordDisabled()) {
-            disablePasswordContainer.setVisibility(View.GONE);
-        } else {
-            disablePasswordContainer.setVisibility(View.VISIBLE);
-        }
-    }
-
     @Override
     protected void onResume() {
         super.onResume();
-        updateContainerVisibility();
-        applyFilter(editAppLaunchSearch.getText().toString());
+        pagerAdapter.notifyDataSetChanged();
+        if (editAppLaunchSearch != null) {
+            applyFilter(editAppLaunchSearch.getText().toString());
+        }
     }
 
     @Override
@@ -143,6 +156,9 @@ public class DangerZoneActivity extends AppCompatActivity {
     }
 
     private void applyFilter(@NonNull String search) {
+        if (adapter == null) {
+            return;
+        }
         filteredPackages.clear();
         StaticProcessList staticProcessList = StaticProcessList.fromPreferences(kernel, kernel.getPreferences());
         String needle = search.trim().toLowerCase();
@@ -175,5 +191,74 @@ public class DangerZoneActivity extends AppCompatActivity {
         });
 
         adapter.setItems(filteredPackages);
+    }
+
+    /**
+     * Two static pages: app icons, and the unlock-password panel. The unlock
+     * page is omitted entirely (itemCount drops to 1) during configured
+     * password-disabled windows, matching the old container-visibility gating.
+     */
+    private class DangerZonePagerAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+        @Override
+        public int getItemViewType(int position) {
+            return position;
+        }
+
+        @Override
+        public int getItemCount() {
+            return kernel.isPasswordDisabled() ? 1 : 2;
+        }
+
+        @NonNull
+        @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            LayoutInflater inflater = LayoutInflater.from(parent.getContext());
+            if (viewType == PAGE_ICONS) {
+                View view = inflater.inflate(R.layout.panel_danger_zone_icons, parent, false);
+                setupIconsPage(view);
+                return new RecyclerView.ViewHolder(view) {
+                };
+            } else {
+                View view = inflater.inflate(R.layout.panel_danger_zone_unlock, parent, false);
+                setupUnlockPage(view);
+                return new RecyclerView.ViewHolder(view) {
+                };
+            }
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+        }
+    }
+
+    /** Masks entered characters with '*' instead of the system's default dot. */
+    private static class AsteriskPasswordTransformationMethod extends PasswordTransformationMethod {
+        @Override
+        public CharSequence getTransformation(CharSequence source, View view) {
+            return new AsteriskCharSequence(source);
+        }
+
+        private static class AsteriskCharSequence implements CharSequence {
+            private final CharSequence source;
+
+            AsteriskCharSequence(CharSequence source) {
+                this.source = source;
+            }
+
+            @Override
+            public int length() {
+                return source.length();
+            }
+
+            @Override
+            public char charAt(int index) {
+                return '*';
+            }
+
+            @Override
+            public CharSequence subSequence(int start, int end) {
+                return source.subSequence(start, end);
+            }
+        }
     }
 }
