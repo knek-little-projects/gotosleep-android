@@ -25,12 +25,15 @@ import android.os.Debug;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.text.method.HideReturnsTransformationMethod;
+import android.text.method.PasswordTransformationMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -78,6 +81,8 @@ public class ControlActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
+        NightMode.apply(this);
+
         final CheckBox doesPasswordHasDisablePeriod = (CheckBox) findViewById(R.id.disablePassword);
         doesPasswordHasDisablePeriod.setChecked(preferences.doesPasswordHasDisablePeriod());
 
@@ -98,6 +103,9 @@ public class ControlActivity extends AppCompatActivity {
 
         TextView pdfFolderPathEdit = (TextView) findViewById(R.id.pdfFolderPathEdit);
         pdfFolderPathEdit.setText(preferences.getPdfFolderPath());
+
+        wirePasswordVisibilityToggle(R.id.failsafePasswordEdit, R.id.failsafePasswordVisibilityToggle);
+        wirePasswordVisibilityToggle(R.id.blacklistOnDemandPasswordEdit, R.id.blacklistOnDemandPasswordVisibilityToggle);
 
         TextView tercActivityURL = (TextView) findViewById(R.id.editTercActivityURL);
         tercActivityURL.setText(preferences.getTERCActivityURL());
@@ -240,6 +248,29 @@ public class ControlActivity extends AppCompatActivity {
                             != Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);
             kernel.runAnotherHomeLauncher();
         }
+    }
+
+    private void wirePasswordVisibilityToggle(int editId, int toggleButtonId) {
+        final EditText edit = (EditText) findViewById(editId);
+        final ImageButton toggle = (ImageButton) findViewById(toggleButtonId);
+        final boolean[] visible = {false};
+
+        toggle.setOnClickListener(v -> {
+            visible[0] = !visible[0];
+            int selection = edit.getSelectionStart();
+            if (visible[0]) {
+                edit.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
+                toggle.setImageResource(R.drawable.ic_visibility_off);
+                toggle.setContentDescription("Hide password");
+            } else {
+                edit.setTransformationMethod(PasswordTransformationMethod.getInstance());
+                toggle.setImageResource(R.drawable.ic_visibility);
+                toggle.setContentDescription("Show password");
+            }
+            if (selection >= 0) {
+                edit.setSelection(selection);
+            }
+        });
     }
 
     private boolean hasUsageStatsPermission() {

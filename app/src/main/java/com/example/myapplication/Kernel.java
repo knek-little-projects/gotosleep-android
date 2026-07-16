@@ -288,6 +288,13 @@ public class Kernel {
         return false;
     }
 
+    public boolean isDarkModeActiveNow() {
+        if (preferences.isDarkModeScheduleEnabled()) {
+            return isTimeSeq(preferences.getDarkModeScheduleStart(), getNow(), preferences.getDarkModeScheduleEnd());
+        }
+        return preferences.isDarkModeEnabled();
+    }
+
     static public boolean isTimeSeq(String a, String b, String c) {
         if (a.compareTo(c) <= 0) {
             return a.compareTo(b) <= 0 && b.compareTo(c) < 0;

@@ -35,6 +35,8 @@ public class Preferences {
     static public final Boolean defaultIsTERCActivityAllowed = false;
     static public final int defaultCurPeriod = 0;
     static public final int defaultPrevPeriod = 0;
+    static public final String defaultDarkModeScheduleStart = "21:00";
+    static public final String defaultDarkModeScheduleEnd = "04:00";
 
     static private final String TERC_USE = "TERC_USE";
     static private final String TERC_IS_ACTIVITY_ALLOWED = "TERC_IS_ACTIVITY_ALLOWED";
@@ -80,6 +82,10 @@ public class Preferences {
     static private final String LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS = "LAST_FALLBACK_LOCK_NOTIFICATION_MILLIS";
     /** User-configurable root folder the PDF panel scans recursively. Empty = use the Downloads default. */
     static private final String PDF_FOLDER_PATH = "PDF_FOLDER_PATH";
+    static private final String DARK_MODE_ENABLED = "DARK_MODE_ENABLED";
+    static private final String DARK_MODE_SCHEDULE_ENABLED = "DARK_MODE_SCHEDULE_ENABLED";
+    static private final String DARK_MODE_SCHEDULE_START = "DARK_MODE_SCHEDULE_START";
+    static private final String DARK_MODE_SCHEDULE_END = "DARK_MODE_SCHEDULE_END";
 
     private Context context;
 
@@ -280,6 +286,42 @@ public class Preferences {
         editor.apply();
     }
 
+    public boolean isDarkModeEnabled() {
+        return getPreferences().getBoolean(DARK_MODE_ENABLED, false);
+    }
+
+    public void setDarkModeEnabled(boolean enabled) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putBoolean(DARK_MODE_ENABLED, enabled);
+        editor.apply();
+    }
+
+    public boolean isDarkModeScheduleEnabled() {
+        return getPreferences().getBoolean(DARK_MODE_SCHEDULE_ENABLED, false);
+    }
+
+    public void setDarkModeScheduleEnabled(boolean enabled) {
+        SharedPreferences.Editor editor = getPreferences().edit();
+        editor.putBoolean(DARK_MODE_SCHEDULE_ENABLED, enabled);
+        editor.apply();
+    }
+
+    public String getDarkModeScheduleStart() {
+        return getPreferences().getString(DARK_MODE_SCHEDULE_START, defaultDarkModeScheduleStart);
+    }
+
+    public boolean setDarkModeScheduleStart(String hhmm) {
+        return setTimeLevel(DARK_MODE_SCHEDULE_START, hhmm);
+    }
+
+    public String getDarkModeScheduleEnd() {
+        return getPreferences().getString(DARK_MODE_SCHEDULE_END, defaultDarkModeScheduleEnd);
+    }
+
+    public boolean setDarkModeScheduleEnd(String hhmm) {
+        return setTimeLevel(DARK_MODE_SCHEDULE_END, hhmm);
+    }
+
     public Set<String> getDangerProcessesSet() {
         Set<String> hs = new HashSet<>(Arrays.asList(getDangerProcessesString().split("\\s+")));
         hs.remove("");
@@ -459,6 +501,10 @@ public class Preferences {
         obj.put("passwordDisablePeriodStart", getPasswordDisablePeriodStart());
         obj.put("passwordDisablePeriodEnd", getPasswordDisablePeriodEnd());
         obj.put("pdfFolderPath", getPdfFolderPath());
+        obj.put("darkModeEnabled", isDarkModeEnabled());
+        obj.put("darkModeScheduleEnabled", isDarkModeScheduleEnabled());
+        obj.put("darkModeScheduleStart", getDarkModeScheduleStart());
+        obj.put("darkModeScheduleEnd", getDarkModeScheduleEnd());
         return obj;
     }
 
@@ -498,6 +544,14 @@ public class Preferences {
         }
         setPasswordHasDisablePeriod(obj.optBoolean("passwordDisablePeriodEnabled", false));
         setPdfFolderPath(obj.optString("pdfFolderPath", getPdfFolderPath()));
+
+        setDarkModeEnabled(obj.optBoolean("darkModeEnabled", isDarkModeEnabled()));
+        String darkStart = obj.optString("darkModeScheduleStart", defaultDarkModeScheduleStart);
+        String darkEnd = obj.optString("darkModeScheduleEnd", defaultDarkModeScheduleEnd);
+        if (!setDarkModeScheduleStart(darkStart) || !setDarkModeScheduleEnd(darkEnd)) {
+            return "Invalid dark mode schedule";
+        }
+        setDarkModeScheduleEnabled(obj.optBoolean("darkModeScheduleEnabled", isDarkModeScheduleEnabled()));
 
         return null;
     }

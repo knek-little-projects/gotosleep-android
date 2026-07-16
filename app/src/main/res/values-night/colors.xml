@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="iconPlaceholderBackground">#333333</color>
+    <color name="failsafePasswordBackground">#5C3636</color>
+    <color name="blacklistPasswordBackground">#2E4B5C</color>
+</resources>

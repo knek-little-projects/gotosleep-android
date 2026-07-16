@@ -24,7 +24,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -164,18 +166,17 @@ public class DangerZoneActivity extends AppCompatActivity {
 
         pdfRefreshButton.setOnClickListener(v -> triggerPdfScan());
 
-        pdfExecutor.execute(() -> {
-            boolean firstRun = !pdfCache.cacheFileExists();
-            pdfCache.load();
-            List<String> sorted = pdfCache.getSortedPaths();
-            mainHandler.post(() -> {
-                pdfAdapter.setItems(sorted);
-                applyPdfFilter(editPdfSearch.getText().toString());
-            });
-            if (firstRun) {
-                runPdfScan();
-            }
-        });
+        // Loading the cached JSON is just an in-memory parse (no filesystem walk), so it's
+        // done synchronously here instead of round-tripping through pdfExecutor - that removes
+        // the async gap where the page would render empty for a moment before a background
+        // load finished, which looked like "the cache isn't being used at all".
+        boolean firstRun = !pdfCache.cacheFileExists();
+        pdfCache.load();
+        pdfAdapter.setItems(pdfCache.getSortedPaths());
+        applyPdfFilter(editPdfSearch.getText().toString());
+        if (firstRun) {
+            runPdfScan();
+        }
     }
 
     private void setupUnlockPage(@NonNull View view) {
@@ -202,6 +203,42 @@ public class DangerZoneActivity extends AppCompatActivity {
                     Toast.makeText(context, "Wrong password!", Toast.LENGTH_SHORT).show();
                 }
             }
+        });
+
+        Preferences preferences = kernel.getPreferences();
+
+        Switch darkModeSwitch = view.findViewById(R.id.darkModeSwitch);
+        darkModeSwitch.setChecked(preferences.isDarkModeEnabled());
+        darkModeSwitch.setEnabled(!preferences.isDarkModeScheduleEnabled());
+        darkModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            preferences.setDarkModeEnabled(isChecked);
+            NightMode.apply(context);
+        });
+
+        CheckBox darkModeScheduleCheckbox = view.findViewById(R.id.darkModeScheduleCheckbox);
+        EditText darkModeScheduleStartEdit = view.findViewById(R.id.darkModeScheduleStartEdit);
+        EditText darkModeScheduleEndEdit = view.findViewById(R.id.darkModeScheduleEndEdit);
+        Button darkModeScheduleSaveButton = view.findViewById(R.id.darkModeScheduleSaveButton);
+
+        darkModeScheduleCheckbox.setChecked(preferences.isDarkModeScheduleEnabled());
+        darkModeScheduleStartEdit.setText(preferences.getDarkModeScheduleStart());
+        darkModeScheduleEndEdit.setText(preferences.getDarkModeScheduleEnd());
+
+        darkModeScheduleCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            preferences.setDarkModeScheduleEnabled(isChecked);
+            darkModeSwitch.setEnabled(!isChecked);
+            NightMode.apply(context);
+        });
+
+        darkModeScheduleSaveButton.setOnClickListener(v -> {
+            String start = darkModeScheduleStartEdit.getText().toString().trim();
+            String end = darkModeScheduleEndEdit.getText().toString().trim();
+            if (!preferences.setDarkModeScheduleStart(start) || !preferences.setDarkModeScheduleEnd(end)) {
+                Toast.makeText(context, "Invalid time format, use HH:MM", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Toast.makeText(context, "Night schedule saved", Toast.LENGTH_SHORT).show();
+            NightMode.apply(context);
         });
 
         refreshUnlockGating();
@@ -302,6 +339,7 @@ public class DangerZoneActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        NightMode.apply(context);
         refreshUnlockGating();
         if (editAppLaunchSearch != null) {
             applyFilter(editAppLaunchSearch.getText().toString());

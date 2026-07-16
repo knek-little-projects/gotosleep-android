@@ -1,6 +1,7 @@
 package com.example.myapplication;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -30,6 +31,7 @@ import java.util.Map;
  * own JSON file instead; disk writes are always done off the caller's thread.
  */
 public class PdfCache {
+    private static final String TAG = "PdfCache";
 
     private static class Entry {
         final String path;
@@ -79,6 +81,7 @@ public class PdfCache {
                         obj.optLong("lastClickMillis", 0L)));
             }
         } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to load " + cacheFile + ", starting from an empty cache", e);
             entries.clear();
         }
     }
@@ -138,6 +141,7 @@ public class PdfCache {
                 array.put(obj);
             }
         } catch (JSONException e) {
+            Log.e(TAG, "Failed to serialize PDF cache", e);
             return;
         }
 
@@ -145,8 +149,16 @@ public class PdfCache {
         try (OutputStream out = new FileOutputStream(tmp)) {
             out.write(array.toString().getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
+            Log.e(TAG, "Failed to write " + tmp, e);
             return;
         }
-        tmp.renameTo(cacheFile);
+        if (!tmp.renameTo(cacheFile)) {
+            Log.e(TAG, "Rename " + tmp + " -> " + cacheFile + " failed, retrying with delete-first");
+            // Some filesystems refuse to rename over an existing destination; clear it out and retry once.
+            cacheFile.delete();
+            if (!tmp.renameTo(cacheFile)) {
+                Log.e(TAG, "PDF cache write lost - could not persist " + cacheFile);
+            }
+        }
     }
 }

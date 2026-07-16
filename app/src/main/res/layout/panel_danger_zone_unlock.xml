@@ -18,7 +18,7 @@
             android:id="@+id/failsafePasswordEdit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#E4BCBC"
+            android:background="@color/failsafePasswordBackground"
             android:ems="10"
             android:gravity="center"
             android:inputType="textPassword" />
@@ -38,5 +38,46 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:visibility="gone" />
+
+    <Switch
+        android:id="@+id/darkModeSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="Dark mode" />
+
+    <CheckBox
+        android:id="@+id/darkModeScheduleCheckbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="By time" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <EditText
+            android:id="@+id/darkModeScheduleStartEdit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ems="5"
+            android:hint="21:00" />
+
+        <EditText
+            android:id="@+id/darkModeScheduleEndEdit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ems="5"
+            android:hint="04:00" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/darkModeScheduleSaveButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Save night schedule" />
 
 </LinearLayout>

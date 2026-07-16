@@ -372,7 +372,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:height="400px"
-                    android:background="#E4BCBC"
+                    android:background="@color/failsafePasswordBackground"
                     android:ems="10"
                     android:gravity="start|top"
                     android:inputType="textMultiLine" />
@@ -516,13 +516,30 @@
                         android:layout_height="wrap_content"
                         android:text="Failsafe password:" />
 
-                    <EditText
-                        android:id="@+id/failsafePasswordEdit"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="#E4BCBC"
-                        android:ems="10"
-                        android:gravity="start|top" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <EditText
+                            android:id="@+id/failsafePasswordEdit"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:background="@color/failsafePasswordBackground"
+                            android:ems="10"
+                            android:gravity="start|top"
+                            android:inputType="textPassword" />
+
+                        <ImageButton
+                            android:id="@+id/failsafePasswordVisibilityToggle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Show password"
+                            android:src="@drawable/ic_visibility" />
+                    </LinearLayout>
 
                     <Button
                         android:id="@+id/failsafePasswordButton"
@@ -542,13 +559,30 @@
                         android:layout_height="wrap_content"
                         android:text="Blacklist-on-demand password:" />
 
-                    <EditText
-                        android:id="@+id/blacklistOnDemandPasswordEdit"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="#BCD4E4"
-                        android:ems="10"
-                        android:gravity="start|top" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <EditText
+                            android:id="@+id/blacklistOnDemandPasswordEdit"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:background="@color/blacklistPasswordBackground"
+                            android:ems="10"
+                            android:gravity="start|top"
+                            android:inputType="textPassword" />
+
+                        <ImageButton
+                            android:id="@+id/blacklistOnDemandPasswordVisibilityToggle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="Show password"
+                            android:src="@drawable/ic_visibility" />
+                    </LinearLayout>
 
                     <TextView
                         android:layout_width="match_parent"

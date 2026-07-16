@@ -16,7 +16,7 @@
         android:id="@+id/row_icon"
         android:layout_width="75dp"
         android:layout_height="75dp"
-        android:background="#EEEEEE"
+        android:background="@color/iconPlaceholderBackground"
         android:contentDescription="@null"
         android:scaleType="fitCenter" />
 

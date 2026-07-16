@@ -11,7 +11,7 @@
         android:id="@+id/dz_row_icon"
         android:layout_width="75dp"
         android:layout_height="75dp"
-        android:background="#EEEEEE"
+        android:background="@color/iconPlaceholderBackground"
         android:clickable="true"
         android:contentDescription="@null"
         android:focusable="true"
